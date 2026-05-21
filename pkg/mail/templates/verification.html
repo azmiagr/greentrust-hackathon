@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verifikasi Akun - GreenTrust</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            background-color: #eef5f0;
+            color: #24352b;
+        }
+
+        .wrapper {
+            width: 100%;
+            background-color: #eef5f0;
+            background-image: radial-gradient(#b8cbbf 0.5px, transparent 0.5px);
+            background-size: 20px 20px;
+            padding: 50px 10px;
+        }
+
+        .main-card {
+            background-color: #ffffff;
+            margin: 0 auto;
+            max-width: 600px;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            border: 1px solid #d1d5db;
+        }
+
+        .brand-header {
+            background-color: #205336;
+            padding: 30px 40px;
+            text-align: center;
+        }
+
+        .brand-name {
+            color: #ffffff;
+            font-size: 24px;
+            font-weight: 800;
+            letter-spacing: 0.2px;
+        }
+
+        .brand-subtitle {
+            color: #d8e5dd;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            margin-top: 6px;
+        }
+
+        .content {
+            padding: 40px;
+            text-align: left;
+        }
+
+        .headline {
+            font-size: 22px;
+            font-weight: 700;
+            color: #205336;
+            margin: 0 0 20px 0;
+            letter-spacing: -0.5px;
+        }
+
+        .text-body {
+            font-size: 15px;
+            line-height: 1.7;
+            color: #475569;
+            margin-bottom: 30px;
+        }
+
+        .otp-section {
+            background-color: #f3f8f5;
+            border-radius: 8px;
+            padding: 30px;
+            text-align: center;
+            border: 1px solid #d8e5dd;
+            margin-bottom: 35px;
+        }
+
+        .otp-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        .otp-code {
+            font-size: 40px;
+            font-weight: 800;
+            letter-spacing: 10px;
+            color: #205336;
+            margin: 0;
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+        .btn-container {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .btn-primary {
+            background-color: #205336;
+            color: #ffffff !important;
+            padding: 15px 40px;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 16px;
+            display: inline-block;
+        }
+
+        .footer {
+            padding: 30px 40px;
+            background-color: #f8fafc;
+            border-top: 1px solid #e2e8f0;
+            font-size: 12px;
+            color: #64748b;
+            line-height: 1.6;
+        }
+
+        .security-note {
+            color: #205336;
+            font-weight: 600;
+        }
+
+        .copyright {
+            margin-top: 25px;
+            text-align: center;
+            font-size: 11px;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 20px;
+        }
+
+        @media screen and (max-width: 480px) {
+
+            .content,
+            .footer {
+                padding: 25px;
+            }
+
+            .headline {
+                font-size: 20px;
+            }
+
+            .otp-code {
+                font-size: 32px;
+                letter-spacing: 6px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wrapper">
+        <table class="main-card" cellpadding="0" cellspacing="0">
+            <tr>
+                <td class="brand-header">
+                    <div class="brand-name">GreenTrust Passport</div>
+                    <div class="brand-subtitle">Republik Indonesia &middot; MVP</div>
+                </td>
+            </tr>
+            <tr>
+                <td class="content">
+                    <h1 class="headline">Konfirmasi Registrasi Akun</h1>
+
+                    <p class="text-body">
+                        Hai, <strong>{{.Name}}</strong>,<br><br>
+                        Terima kasih telah melakukan pendaftaran di platform <strong>GreenTrust</strong>.
+                        Langkah ini diperlukan untuk memastikan validitas data dan keamanan akun Anda sebelum dapat
+                        mengakses fitur GreenTrust Passport.
+                        <br><br>
+                        Silakan gunakan kode verifikasi di bawah ini untuk melanjutkan proses aktivasi:
+                    </p>
+
+                    <div class="otp-section">
+                        <span class="otp-label">Kode Otentikasi</span>
+                        <h2 class="otp-code">{{.Code}}</h2>
+                    </div>
+
+                    <p class="text-body" style="text-align: center; font-size: 14px;">
+                        Atau klik tautan di bawah ini untuk verifikasi secara langsung:
+                    </p>
+
+                    <div class="btn-container">
+                        <a href="{{.VerificationLink}}" class="btn-primary">Verifikasi Akun Anda</a>
+                    </div>
+                </td>
+            </tr>
+            <tr>
+                <td class="footer">
+                    <strong>Penting:</strong>
+                    <br>
+                    Kode verifikasi ini bersifat rahasia dan hanya berlaku selama <strong>{{.ExpiryMinutes}}
+                        menit</strong>. Mohon untuk tidak memberikan kode ini kepada pihak manapun.
+                    <br><br>
+                    <span class="security-note">Catatan Keamanan:</span> GreenTrust tidak pernah meminta data
+                    sensitif seperti kata sandi atau informasi perbankan melalui saluran komunikasi tidak resmi.
+
+                    <div class="copyright">
+                        &copy; {{.Year}} <strong>GreenTrust</strong>. Seluruh hak cipta dilindungi
+                        undang-undang.<br>
+                        <a href="https://greentrust.id/"
+                            style="color: #205336; text-decoration: none;">www.greentrust.id</a>
+                    </div>
+                </td>
+            </tr>
+        </table>
+    </div>
+</body>
+
+</html>

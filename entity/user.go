@@ -15,6 +15,7 @@ type User struct {
 	CreatedAt time.Time `json:"created_at" gorm:"type:timestamp"`
 	UpdatedAt time.Time `json:"updated_at" gorm:"type:timestamp"`
 
+	OTPs         []OTP        `json:"otps" gorm:"foreignKey:UserID;constraint:onDelete:CASCADE"`
 	UserIdentity UserIdentity `json:"user_identity" gorm:"foreignKey:UserID;constraint:onDelete:CASCADE"`
 	UMKMProfile  UMKMProfile  `json:"umkm_profile" gorm:"foreignKey:UserID;constraint:onDelete:CASCADE"`
 }
