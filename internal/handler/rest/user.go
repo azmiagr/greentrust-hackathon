@@ -47,12 +47,37 @@ func (r *Rest) VerifyOTP(c *gin.Context) {
 }
 
 func (r *Rest) SubmitUserIdentity(c *gin.Context) {
-	var param model.SubmitUserIdentityParam
-
-	err := c.ShouldBindJSON(&param)
+	err := c.Request.ParseMultipartForm(20 << 20)
 	if err != nil {
-		response.Error(c, http.StatusBadRequest, "failed to bind input", err)
+		response.Error(c, http.StatusBadRequest, "failed to parse multipart form", err)
 		return
+	}
+
+	isConfirmed, err := strconv.ParseBool(c.PostForm("is_confirmed"))
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "is_confirmed must be boolean", err)
+		return
+	}
+
+	ktpFile, err := c.FormFile("ktp_file")
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "ktp_file is required", err)
+		return
+	}
+
+	param := model.SubmitUserIdentityParam{
+		KTPFile:      ktpFile,
+		FirstName:    c.PostForm("first_name"),
+		LastName:     c.PostForm("last_name"),
+		NIK:          c.PostForm("nik"),
+		BirthPlace:   c.PostForm("birth_place"),
+		BirthDate:    c.PostForm("birth_date"),
+		Address:      c.PostForm("address"),
+		Province:     c.PostForm("province"),
+		City:         c.PostForm("city"),
+		PhoneNumber:  c.PostForm("phone_number"),
+		EmailContact: c.PostForm("email_contact"),
+		IsConfirmed:  isConfirmed,
 	}
 
 	sessionToken := c.GetHeader("X-Session-Token")

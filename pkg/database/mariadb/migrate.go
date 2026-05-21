@@ -17,6 +17,8 @@ func Migrate(db *gorm.DB) error {
 		&entity.InvestorProfile{},
 		&entity.Skill{},
 		&entity.InvestorPosition{},
+		&entity.Proposal{},
+		&entity.ProposalAttachment{},
 		&entity.GreenPassport{},
 		&entity.LocationPhoto{},
 		&entity.UMKMProduct{},
