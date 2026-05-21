@@ -24,14 +24,16 @@ import (
 type IUserService interface {
 	RegisterUser(param model.RegisterUserParam) (*model.RegisterResponse, error)
 	VerifyOTP(sessionToken string, param model.VerifyOTPParam) (*model.VerifyOTPResponse, error)
+	SubmitUserIdentity(sessionToken string, param model.SubmitUserIdentityParam) (*model.SubmitUserIdentityResponse, error)
 }
 
 type UserService struct {
-	db       *gorm.DB
-	userRepo repository.IUserRepository
-	otpRepo  repository.IOTPRepository
-	jwtAuth  jwt.Interface
-	bcrypt   bcrypt.Interface
+	db               *gorm.DB
+	userRepo         repository.IUserRepository
+	otpRepo          repository.IOTPRepository
+	jwtAuth          jwt.Interface
+	bcrypt           bcrypt.Interface
+	userIdentityRepo repository.IUserIdentityRepository
 }
 
 func NewUserService(
@@ -39,13 +41,15 @@ func NewUserService(
 	otpRepo repository.IOTPRepository,
 	jwtAuth jwt.Interface,
 	bcrypt bcrypt.Interface,
+	userIdentityRepo repository.IUserIdentityRepository,
 ) IUserService {
 	return &UserService{
-		db:       mariadb.Connection,
-		userRepo: userRepo,
-		otpRepo:  otpRepo,
-		jwtAuth:  jwtAuth,
-		bcrypt:   bcrypt,
+		db:               mariadb.Connection,
+		userRepo:         userRepo,
+		otpRepo:          otpRepo,
+		jwtAuth:          jwtAuth,
+		bcrypt:           bcrypt,
+		userIdentityRepo: userIdentityRepo,
 	}
 }
 
@@ -231,6 +235,121 @@ func (s *UserService) VerifyOTP(sessionToken string, param model.VerifyOTPParam)
 	return &model.VerifyOTPResponse{
 		SessionToken: newSessionToken,
 		Message:      "account verified successfully",
+	}, nil
+}
+
+func (s *UserService) SubmitUserIdentity(sessionToken string, param model.SubmitUserIdentityParam) (*model.SubmitUserIdentityResponse, error) {
+	if sessionToken == "" {
+		return nil, apperrors.Unauthorized("missing session token")
+	}
+
+	claims, err := s.jwtAuth.ValidateRegistrationSessionToken(sessionToken)
+	if err != nil {
+		return nil, apperrors.Unauthorized("invalid session token")
+	}
+
+	if !claims.Verified {
+		return nil, apperrors.Forbidden("email verification required")
+	}
+
+	birthDate, err := time.Parse("2006-01-02", param.BirthDate)
+	if err != nil {
+		return nil, apperrors.BadRequest("birth_date must use YYYY-MM-DD format")
+	}
+
+	tx := s.db.Begin()
+	if tx.Error != nil {
+		return nil, apperrors.InternalServer("failed to start transaction")
+	}
+	defer tx.Rollback()
+
+	var userID uuid.UUID
+	if claims.UserID != nil {
+		userID = *claims.UserID
+	}
+
+	user, err := s.userRepo.GetUser(tx, model.GetUserParam{
+		UserID: userID,
+		Email:  claims.Email,
+	})
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperrors.NotFound("user not found")
+		}
+		return nil, apperrors.InternalServer("failed to get user")
+	}
+
+	if user.Status != "active" {
+		return nil, apperrors.Forbidden("user account is not active")
+	}
+
+	existingIdentity, err := s.userIdentityRepo.GetUserIdentity(tx, model.GetUserIdentityParam{
+		UserID: user.UserID,
+	})
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, apperrors.InternalServer("failed to get user identity")
+	}
+
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		identity := &entity.UserIdentity{
+			IdentityID:   uuid.New(),
+			UserID:       user.UserID,
+			KTPFilePath:  param.KTPFilePath,
+			FirstName:    param.FirstName,
+			LastName:     param.LastName,
+			NIK:          param.NIK,
+			BirthPlace:   param.BirthPlace,
+			BirthDate:    birthDate,
+			Address:      param.Address,
+			Province:     param.Province,
+			City:         param.City,
+			PhoneNumber:  param.PhoneNumber,
+			EmailContact: param.EmailContact,
+			IsConfirmed:  param.IsConfirmed,
+		}
+
+		err = s.userIdentityRepo.CreateUserIdentity(tx, identity)
+		if err != nil {
+			return nil, apperrors.InternalServer("failed to create user identity")
+		}
+
+		err = tx.Commit().Error
+		if err != nil {
+			return nil, apperrors.InternalServer("failed to commit transaction")
+		}
+
+		return &model.SubmitUserIdentityResponse{
+			IdentityID: identity.IdentityID,
+			Message:    "identity submitted successfully",
+		}, nil
+	}
+
+	existingIdentity.KTPFilePath = param.KTPFilePath
+	existingIdentity.FirstName = param.FirstName
+	existingIdentity.LastName = param.LastName
+	existingIdentity.NIK = param.NIK
+	existingIdentity.BirthPlace = param.BirthPlace
+	existingIdentity.BirthDate = birthDate
+	existingIdentity.Address = param.Address
+	existingIdentity.Province = param.Province
+	existingIdentity.City = param.City
+	existingIdentity.PhoneNumber = param.PhoneNumber
+	existingIdentity.EmailContact = param.EmailContact
+	existingIdentity.IsConfirmed = param.IsConfirmed
+
+	err = s.userIdentityRepo.UpdateUserIdentity(tx, existingIdentity)
+	if err != nil {
+		return nil, apperrors.InternalServer("failed to update user identity")
+	}
+
+	err = tx.Commit().Error
+	if err != nil {
+		return nil, apperrors.InternalServer("failed to commit transaction")
+	}
+
+	return &model.SubmitUserIdentityResponse{
+		IdentityID: existingIdentity.IdentityID,
+		Message:    "identity submitted successfully",
 	}, nil
 }
 

@@ -31,6 +31,9 @@ func (r *Rest) MountEndpoint() {
 	auth.POST("/register", r.RegisterUser)
 	auth.POST("/verify-otp", r.VerifyOTP)
 
+	onboarding := baseURL.Group("/onboarding")
+	onboarding.POST("/identity", r.SubmitUserIdentity)
+
 }
 
 func (r *Rest) Run() {

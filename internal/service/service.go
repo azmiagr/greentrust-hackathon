@@ -11,7 +11,7 @@ type Service struct {
 }
 
 func NewService(repository *repository.Repository, bcrypt bcrypt.Interface, jwtAuth jwt.Interface) *Service {
-	userService := NewUserService(repository.UserRepository, repository.OTPRepository, jwtAuth, bcrypt)
+	userService := NewUserService(repository.UserRepository, repository.OTPRepository, jwtAuth, bcrypt, repository.UserIdentityRepository)
 	return &Service{
 		UserService: userService,
 	}

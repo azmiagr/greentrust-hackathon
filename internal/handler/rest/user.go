@@ -44,3 +44,23 @@ func (r *Rest) VerifyOTP(c *gin.Context) {
 
 	response.Success(c, http.StatusOK, "success to verify otp", result)
 }
+
+func (r *Rest) SubmitUserIdentity(c *gin.Context) {
+	var param model.SubmitUserIdentityParam
+
+	err := c.ShouldBindJSON(&param)
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "failed to bind input", err)
+		return
+	}
+
+	sessionToken := c.GetHeader("X-Session-Token")
+
+	result, err := r.service.UserService.SubmitUserIdentity(sessionToken, param)
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+
+	response.Success(c, http.StatusOK, "success to submit identity", result)
+}
