@@ -16,6 +16,7 @@ type Repository struct {
 	SkillRepository            ISkillRepository
 	EvidenceRepository         IEvidenceRepository
 	GreenPassportRepository    IGreenPassportRepository
+	ProposalRepository         IProposalRepository
 }
 
 func NewRepository(db *gorm.DB) *Repository {
@@ -31,5 +32,6 @@ func NewRepository(db *gorm.DB) *Repository {
 		SkillRepository:            NewSkillRepository(db),
 		EvidenceRepository:         NewEvidenceRepository(db),
 		GreenPassportRepository:    NewGreenPassportRepository(db),
+		ProposalRepository:         NewProposalRepository(db),
 	}
 }

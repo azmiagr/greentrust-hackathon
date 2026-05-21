@@ -63,6 +63,17 @@ func (r *Rest) MountEndpoint() {
 	greenPassport.Use(r.middleware.AuthenticateUser)
 	greenPassport.POST("/issue", r.IssueGreenPassport)
 
+	proposals := baseURL.Group("/proposals")
+	proposals.Use(r.middleware.AuthenticateUser)
+	proposals.POST("", r.CreateProposal)
+	proposals.GET("", r.GetProposals)
+	proposals.GET("/:proposal_id", r.GetProposalDetail)
+	proposals.PUT("/:proposal_id", r.UpdateProposal)
+	proposals.POST("/:proposal_id/send", r.SendProposal)
+	proposals.POST("/:proposal_id/accept", r.AcceptProposal)
+	proposals.POST("/:proposal_id/reject", r.RejectProposal)
+	proposals.POST("/:proposal_id/withdraw", r.WithdrawProposal)
+
 }
 
 func (r *Rest) Run() {

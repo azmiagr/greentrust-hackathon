@@ -276,6 +276,13 @@ func (s *UserService) SubmitUserIdentity(sessionToken string, param model.Submit
 		return nil, apperrors.Forbidden("email verification required")
 	}
 
+	if param.KTPFile == nil {
+		return nil, apperrors.BadRequest("ktp_file is required")
+	}
+	if param.KTPFile.Size > 10*1024*1024 {
+		return nil, apperrors.BadRequest("ktp_file must not exceed 10MB")
+	}
+
 	birthDate, err := time.Parse("2006-01-02", param.BirthDate)
 	if err != nil {
 		return nil, apperrors.BadRequest("birth_date must use YYYY-MM-DD format")
@@ -314,11 +321,16 @@ func (s *UserService) SubmitUserIdentity(sessionToken string, param model.Submit
 		return nil, apperrors.InternalServer("failed to get user identity")
 	}
 
+	ktpURL, err := s.supabase.UploadEvidenceFile(param.KTPFile)
+	if err != nil {
+		return nil, apperrors.BadRequest("failed to upload ktp_file")
+	}
+
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		identity := &entity.UserIdentity{
 			IdentityID:   uuid.New(),
 			UserID:       user.UserID,
-			KTPFilePath:  param.KTPFilePath,
+			KTPFilePath:  ktpURL,
 			FirstName:    param.FirstName,
 			LastName:     param.LastName,
 			NIK:          param.NIK,
@@ -334,6 +346,7 @@ func (s *UserService) SubmitUserIdentity(sessionToken string, param model.Submit
 
 		err = s.userIdentityRepo.CreateUserIdentity(tx, identity)
 		if err != nil {
+			_ = s.supabase.DeleteFile(ktpURL)
 			if isDuplicateEntryError(err) {
 				return nil, apperrors.Conflict("nik already registered")
 			}
@@ -342,6 +355,7 @@ func (s *UserService) SubmitUserIdentity(sessionToken string, param model.Submit
 
 		err = tx.Commit().Error
 		if err != nil {
+			_ = s.supabase.DeleteFile(ktpURL)
 			return nil, apperrors.InternalServer("failed to commit transaction")
 		}
 
@@ -357,7 +371,8 @@ func (s *UserService) SubmitUserIdentity(sessionToken string, param model.Submit
 		}, nil
 	}
 
-	existingIdentity.KTPFilePath = param.KTPFilePath
+	oldKTPFilePath := existingIdentity.KTPFilePath
+	existingIdentity.KTPFilePath = ktpURL
 	existingIdentity.FirstName = param.FirstName
 	existingIdentity.LastName = param.LastName
 	existingIdentity.NIK = param.NIK
@@ -372,6 +387,7 @@ func (s *UserService) SubmitUserIdentity(sessionToken string, param model.Submit
 
 	err = s.userIdentityRepo.UpdateUserIdentity(tx, existingIdentity)
 	if err != nil {
+		_ = s.supabase.DeleteFile(ktpURL)
 		if isDuplicateEntryError(err) {
 			return nil, apperrors.Conflict("nik already registered")
 		}
@@ -380,7 +396,12 @@ func (s *UserService) SubmitUserIdentity(sessionToken string, param model.Submit
 
 	err = tx.Commit().Error
 	if err != nil {
+		_ = s.supabase.DeleteFile(ktpURL)
 		return nil, apperrors.InternalServer("failed to commit transaction")
+	}
+
+	if oldKTPFilePath != "" && oldKTPFilePath != ktpURL {
+		_ = s.supabase.DeleteFile(oldKTPFilePath)
 	}
 
 	newSessionToken, err := s.jwtAuth.CreateRegistrationSessionToken(user.Email, &user.UserID, true, true)
