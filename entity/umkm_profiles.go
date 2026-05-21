@@ -11,6 +11,7 @@ type UMKMProfile struct {
 	UserID                 uuid.UUID `json:"user_id" gorm:"type:varchar(36);not null;uniqueIndex"`
 	SectorID               uuid.UUID `json:"sector_id" gorm:"type:varchar(36);not null;index"`
 	BusinessName           string    `json:"business_name" gorm:"type:varchar(200);not null"`
+	BusinessDescription    string    `json:"business_description" gorm:"type:text"`
 	BusinessAddressLine    string    `json:"business_address_line" gorm:"type:text;not null"`
 	BusinessProvince       string    `json:"business_province" gorm:"type:varchar(100);not null"`
 	BusinessCity           string    `json:"business_city" gorm:"type:varchar(100);not null"`

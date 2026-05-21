@@ -9,6 +9,7 @@ import (
 	"greentrust-hackathon/pkg/database/mariadb"
 	"greentrust-hackathon/pkg/jwt"
 	"greentrust-hackathon/pkg/middleware"
+	"greentrust-hackathon/pkg/supabase"
 	"log"
 )
 
@@ -28,7 +29,8 @@ func main() {
 	repo := repository.NewRepository(db)
 	bcrypt := bcrypt.Init()
 	jwt := jwt.Init()
-	svc := service.NewService(repo, bcrypt, jwt)
+	supabase := supabase.Init()
+	svc := service.NewService(repo, bcrypt, jwt, supabase)
 
 	middleware := middleware.Init(svc, jwt)
 	r := rest.NewRest(svc, middleware)
