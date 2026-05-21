@@ -56,6 +56,7 @@ type UploadEvidenceDocumentParam struct {
 	CategoryID    string
 	RequirementID string
 	File          *multipart.FileHeader
+	AIConfidence  float64
 }
 
 type EvidenceDocumentResponse struct {
