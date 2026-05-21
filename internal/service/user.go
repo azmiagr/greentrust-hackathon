@@ -76,6 +76,11 @@ func (s *UserService) RegisterUser(param model.RegisterUserParam) (*model.Regist
 		return nil, apperrors.BadRequest("password and confirm password do not match")
 	}
 
+	roleID := constants.RoleUMKM
+	if param.Role == "investor" {
+		roleID = constants.RoleInvestor
+	}
+
 	hashedPassword, err := s.bcrypt.GenerateFromPassword(param.Password)
 	if err != nil {
 		return nil, apperrors.InternalServer("failed to generate password")
@@ -99,7 +104,7 @@ func (s *UserService) RegisterUser(param model.RegisterUserParam) (*model.Regist
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		user = &entity.User{
 			UserID:   uuid.New(),
-			RoleID:   constants.RoleUMKM,
+			RoleID:   roleID,
 			Email:    param.Email,
 			Password: hashedPassword,
 			Status:   "inactive",
@@ -109,6 +114,7 @@ func (s *UserService) RegisterUser(param model.RegisterUserParam) (*model.Regist
 			return nil, apperrors.InternalServer("failed to create user")
 		}
 	} else {
+		user.RoleID = roleID
 		user.Password = hashedPassword
 		user.Status = "inactive"
 
