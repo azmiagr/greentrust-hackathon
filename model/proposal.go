@@ -38,8 +38,122 @@ type ProposalListQuery struct {
 	Status string `form:"status"` // draft, sent, accepted, rejected, withdrawn
 }
 
+type InvestorProposalListQuery struct {
+	Tab string `form:"tab"` // sent, requests, approved, rejected
+}
+
+type UMKMProposalListQuery struct {
+	Tab  string `form:"tab"`  // incoming, sent, approved, rejected, all
+	Sort string `form:"sort"` // newest, oldest
+}
+
 type ProposalActionParam struct {
 	Reason string `json:"reason"`
+}
+
+type InvestorProposalListResponse struct {
+	Summary InvestorProposalSummary `json:"summary"`
+	Tabs    InvestorProposalTabs    `json:"tabs"`
+	Items   []InvestorProposalItem  `json:"items"`
+}
+
+type InvestorProposalSummary struct {
+	ActiveProposalsCount      int    `json:"active_proposals_count"`
+	ApprovedUMKMCount         int    `json:"approved_umkm_count"`
+	ApprovalRate              int    `json:"approval_rate"`
+	IncomingUMKMRequestsCount int    `json:"incoming_umkm_requests_count"`
+	ApprovedTotalValue        int64  `json:"approved_total_value"`
+	ApprovedTotalValueLabel   string `json:"approved_total_value_label"`
+	ApprovedTotalPeriodLabel  string `json:"approved_total_period_label"`
+}
+
+type InvestorProposalTabs struct {
+	Sent     int `json:"sent"`
+	Requests int `json:"requests"`
+	Approved int `json:"approved"`
+	Rejected int `json:"rejected"`
+}
+
+type InvestorProposalItem struct {
+	ProposalID        uuid.UUID                    `json:"proposal_id"`
+	ProposalCode      string                       `json:"proposal_code"`
+	Direction         string                       `json:"direction"`
+	Counterparty      ProposalCounterpartyResponse `json:"counterparty"`
+	ProposalType      string                       `json:"proposal_type"`
+	ProposalTypeLabel string                       `json:"proposal_type_label"`
+	Title             string                       `json:"title"`
+	Amount            int64                        `json:"amount"`
+	AmountLabel       string                       `json:"amount_label"`
+	TenorMonths       int                          `json:"tenor_months"`
+	Scheme            string                       `json:"scheme"`
+	Message           string                       `json:"message"`
+	Status            string                       `json:"status"`
+	StatusLabel       string                       `json:"status_label"`
+	StatusTone        string                       `json:"status_tone"`
+	SentAt            *time.Time                   `json:"sent_at"`
+	AcceptedAt        *time.Time                   `json:"accepted_at"`
+	RejectedAt        *time.Time                   `json:"rejected_at"`
+	CreatedAt         time.Time                    `json:"created_at"`
+	UpdatedAt         time.Time                    `json:"updated_at"`
+	Attachments       []ProposalAttachmentResponse `json:"attachments"`
+	CanEdit           bool                         `json:"can_edit"`
+	CanWithdraw       bool                         `json:"can_withdraw"`
+	CanAccept         bool                         `json:"can_accept"`
+	CanReject         bool                         `json:"can_reject"`
+}
+
+type UMKMProposalListResponse struct {
+	Summary UMKMProposalSummary `json:"summary"`
+	Tabs    UMKMProposalTabs    `json:"tabs"`
+	Items   []UMKMProposalItem  `json:"items"`
+}
+
+type UMKMProposalSummary struct {
+	IncomingOffersCount     int    `json:"incoming_offers_count"`
+	SentProposalsCount      int    `json:"sent_proposals_count"`
+	SentRejectedCount       int    `json:"sent_rejected_count"`
+	SentApprovedCount       int    `json:"sent_approved_count"`
+	PendingTotalValue       int64  `json:"pending_total_value"`
+	PendingTotalValueLabel  string `json:"pending_total_value_label"`
+	ResponseRate            int    `json:"response_rate"`
+	AverageResponseTimeDays int    `json:"average_response_time_days"`
+}
+
+type UMKMProposalTabs struct {
+	Incoming int `json:"incoming"`
+	Sent     int `json:"sent"`
+	Approved int `json:"approved"`
+	Rejected int `json:"rejected"`
+	All      int `json:"all"`
+}
+
+type UMKMProposalItem struct {
+	ProposalID        uuid.UUID                    `json:"proposal_id"`
+	ProposalCode      string                       `json:"proposal_code"`
+	Direction         string                       `json:"direction"`
+	Counterparty      ProposalCounterpartyResponse `json:"counterparty"`
+	ProposalType      string                       `json:"proposal_type"`
+	ProposalTypeLabel string                       `json:"proposal_type_label"`
+	Title             string                       `json:"title"`
+	Amount            int64                        `json:"amount"`
+	AmountLabel       string                       `json:"amount_label"`
+	TenorMonths       int                          `json:"tenor_months"`
+	Scheme            string                       `json:"scheme"`
+	Message           string                       `json:"message"`
+	Status            string                       `json:"status"`
+	StatusLabel       string                       `json:"status_label"`
+	StatusTone        string                       `json:"status_tone"`
+	SentAt            *time.Time                   `json:"sent_at"`
+	AcceptedAt        *time.Time                   `json:"accepted_at"`
+	RejectedAt        *time.Time                   `json:"rejected_at"`
+	CreatedAt         time.Time                    `json:"created_at"`
+	UpdatedAt         time.Time                    `json:"updated_at"`
+	Attachments       []ProposalAttachmentResponse `json:"attachments"`
+	CanReview         bool                         `json:"can_review"`
+	CanEdit           bool                         `json:"can_edit"`
+	CanWithdraw       bool                         `json:"can_withdraw"`
+	CanAccept         bool                         `json:"can_accept"`
+	CanReject         bool                         `json:"can_reject"`
 }
 
 type ProposalResponse struct {

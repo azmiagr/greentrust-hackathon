@@ -46,5 +46,6 @@ func (r *UserIdentityRepository) UpdateUserIdentity(tx *gorm.DB, identity *entit
 	if err != nil {
 		return err
 	}
+
 	return nil
 }

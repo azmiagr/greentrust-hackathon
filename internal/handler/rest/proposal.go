@@ -45,6 +45,42 @@ func (r *Rest) GetProposals(c *gin.Context) {
 	response.Success(c, http.StatusOK, "success to get proposals", result)
 }
 
+func (r *Rest) GetInvestorProposals(c *gin.Context) {
+	var query model.InvestorProposalListQuery
+	err := c.ShouldBindQuery(&query)
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "failed to bind query", err)
+		return
+	}
+
+	userID := helper.GetAuthenticatedUserID(c)
+	result, err := r.service.ProposalService.GetInvestorProposals(userID, query)
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+
+	response.Success(c, http.StatusOK, "success to get investor proposals", result)
+}
+
+func (r *Rest) GetUMKMProposals(c *gin.Context) {
+	var query model.UMKMProposalListQuery
+	err := c.ShouldBindQuery(&query)
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "failed to bind query", err)
+		return
+	}
+
+	userID := helper.GetAuthenticatedUserID(c)
+	result, err := r.service.ProposalService.GetUMKMProposals(userID, query)
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+
+	response.Success(c, http.StatusOK, "success to get umkm proposals", result)
+}
+
 func (r *Rest) GetProposalDetail(c *gin.Context) {
 	proposalID, err := uuid.Parse(c.Param("proposal_id"))
 	if err != nil {

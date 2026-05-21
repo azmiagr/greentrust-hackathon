@@ -24,7 +24,7 @@ func NewService(repository *repository.Repository, bcrypt bcrypt.Interface, jwtA
 	}
 
 	userService := NewUserService(repository.UserRepository, repository.OTPRepository, jwtAuth, bcrypt, repository.UserIdentityRepository, repository.BusinessSectorRepository, repository.UMKMProfileRepository, repository.LocationPhotoRepository, supabase)
-	investorService := NewInvestorService(repository.UserRepository, repository.UserIdentityRepository, jwtAuth, repository.InvestorProfileRepository, repository.InvestorPositionRepository, repository.SkillRepository)
+	investorService := NewInvestorService(repository.UserRepository, repository.UserIdentityRepository, jwtAuth, repository.InvestorProfileRepository, repository.InvestorPositionRepository, repository.SkillRepository, repository.BusinessSectorRepository, repository.UMKMProfileRepository, repository.ProposalRepository)
 	evidenceService := NewEvidenceService(repository.UMKMProfileRepository, repository.EvidenceRepository, supabase)
 	greenPassportService := NewGreenPassportService(repository.UMKMProfileRepository, repository.EvidenceRepository, repository.GreenPassportRepository, chainClient, supabase)
 	proposalService := NewProposalService(repository.UserRepository, repository.UserIdentityRepository, repository.UMKMProfileRepository, repository.InvestorProfileRepository, repository.ProposalRepository, supabase)

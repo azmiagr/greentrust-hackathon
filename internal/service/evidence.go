@@ -603,7 +603,7 @@ func selectRequirementDocument(docs []entity.EvidenceDocument) *entity.EvidenceD
 
 func isFulfilledEvidenceStatus(status string) bool {
 	switch status {
-	case "reviewed", "on_chain":
+	case "uploaded", "processing", "classified", "reviewed", "on_chain", "blockchain_failed":
 		return true
 	default:
 		return false

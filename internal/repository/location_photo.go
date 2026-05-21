@@ -43,5 +43,6 @@ func (r *LocationPhotoRepository) DeleteLocationPhotosByProfileID(tx *gorm.DB, p
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
