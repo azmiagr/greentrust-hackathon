@@ -104,3 +104,21 @@ func (r *Rest) SubmitBusinessProfile(c *gin.Context) {
 
 	response.Success(c, http.StatusOK, "success to submit business profile", result)
 }
+
+func (r *Rest) LoginUser(c *gin.Context) {
+	var param model.LoginUserParam
+
+	err := c.ShouldBindJSON(&param)
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "failed to bind input", err)
+		return
+	}
+
+	result, err := r.service.UserService.LoginUser(param)
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+
+	response.Success(c, http.StatusOK, "success to login", result)
+}

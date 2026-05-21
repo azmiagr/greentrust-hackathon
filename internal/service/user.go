@@ -29,6 +29,8 @@ type IUserService interface {
 	VerifyOTP(sessionToken string, param model.VerifyOTPParam) (*model.VerifyOTPResponse, error)
 	SubmitUserIdentity(sessionToken string, param model.SubmitUserIdentityParam) (*model.SubmitUserIdentityResponse, error)
 	SubmitBusinessProfile(sessionToken string, param model.SubmitBusinessProfileParam) (*model.SubmitBusinessProfileResponse, error)
+	LoginUser(param model.LoginUserParam) (*model.LoginResponse, error)
+	GetUser(param model.GetUserParam) (*entity.User, error)
 }
 
 type UserService struct {
@@ -566,6 +568,46 @@ func (s *UserService) SubmitBusinessProfile(sessionToken string, param model.Sub
 		PhotoURLs: currentPhotoURLs,
 		Message:   "business profile submitted successfully",
 	}, nil
+}
+
+func (s *UserService) LoginUser(param model.LoginUserParam) (*model.LoginResponse, error) {
+	user, err := s.userRepo.GetUser(s.db, model.GetUserParam{
+		Email: param.Email,
+	})
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperrors.Unauthorized("invalid email or password")
+		}
+
+		return nil, apperrors.InternalServer("failed to get user")
+	}
+
+	err = s.bcrypt.CompareAndHashPassword(user.Password, param.Password)
+	if err != nil {
+		return nil, apperrors.Unauthorized("invalid email or password")
+	}
+
+	if user.Status != "active" {
+		return nil, apperrors.Forbidden("account is not verified")
+	}
+
+	roleName := "umkm"
+	if user.RoleID == constants.RoleInvestor {
+		roleName = "investor"
+	}
+
+	token, err := s.jwtAuth.CreateJWTToken(user.UserID, roleName)
+	if err != nil {
+		return nil, apperrors.InternalServer("failed to generate token")
+	}
+
+	return &model.LoginResponse{
+		Token: token,
+	}, nil
+}
+
+func (s *UserService) GetUser(param model.GetUserParam) (*entity.User, error) {
+	return s.userRepo.GetUser(s.db, param)
 }
 
 func calculateBusinessProfileCompletionScore(param model.SubmitBusinessProfileParam, photoCount int) float64 {
