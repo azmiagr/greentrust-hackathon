@@ -15,6 +15,7 @@ import (
 	"greentrust-hackathon/pkg/supabase"
 	"net/url"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -29,6 +30,7 @@ type IUserService interface {
 	VerifyOTP(sessionToken string, param model.VerifyOTPParam) (*model.VerifyOTPResponse, error)
 	SubmitUserIdentity(sessionToken string, param model.SubmitUserIdentityParam) (*model.SubmitUserIdentityResponse, error)
 	SubmitBusinessProfile(sessionToken string, param model.SubmitBusinessProfileParam) (*model.SubmitBusinessProfileResponse, error)
+	GetBusinessSectors() ([]model.BusinessSectorResponse, error)
 	LoginUser(param model.LoginUserParam) (*model.LoginResponse, error)
 	GetUser(param model.GetUserParam) (*entity.User, error)
 }
@@ -317,7 +319,8 @@ func (s *UserService) SubmitUserIdentity(sessionToken string, param model.Submit
 	existingIdentity, err := s.userIdentityRepo.GetUserIdentity(tx, model.GetUserIdentityParam{
 		UserID: user.UserID,
 	})
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+	identityNotFound := errors.Is(err, gorm.ErrRecordNotFound)
+	if err != nil && !identityNotFound {
 		return nil, apperrors.InternalServer("failed to get user identity")
 	}
 
@@ -326,7 +329,7 @@ func (s *UserService) SubmitUserIdentity(sessionToken string, param model.Submit
 		return nil, apperrors.BadRequest("failed to upload ktp_file")
 	}
 
-	if errors.Is(err, gorm.ErrRecordNotFound) {
+	if identityNotFound {
 		identity := &entity.UserIdentity{
 			IdentityID:   uuid.New(),
 			UserID:       user.UserID,
@@ -595,6 +598,32 @@ func (s *UserService) SubmitBusinessProfile(sessionToken string, param model.Sub
 		PhotoURLs: currentPhotoURLs,
 		Message:   "business profile submitted successfully",
 	}, nil
+}
+
+func (s *UserService) GetBusinessSectors() ([]model.BusinessSectorResponse, error) {
+	sectors, err := s.businessSectorRepo.GetBusinessSectors(s.db)
+	if err != nil {
+		return nil, apperrors.InternalServer("failed to get business sectors")
+	}
+
+	responses := make([]model.BusinessSectorResponse, 0, len(sectors))
+	for _, sector := range sectors {
+		responses = append(responses, model.BusinessSectorResponse{
+			SectorID:   sector.SectorID,
+			SectorName: sector.SectorName,
+		})
+	}
+	sort.SliceStable(responses, func(i, j int) bool {
+		leftIsOther := strings.EqualFold(strings.TrimSpace(responses[i].SectorName), "lainnya")
+		rightIsOther := strings.EqualFold(strings.TrimSpace(responses[j].SectorName), "lainnya")
+		if leftIsOther != rightIsOther {
+			return !leftIsOther
+		}
+
+		return strings.ToLower(responses[i].SectorName) < strings.ToLower(responses[j].SectorName)
+	})
+
+	return responses, nil
 }
 
 func (s *UserService) LoginUser(param model.LoginUserParam) (*model.LoginResponse, error) {
