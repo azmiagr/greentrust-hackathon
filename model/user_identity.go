@@ -24,6 +24,7 @@ type GetUserIdentityParam struct {
 }
 
 type SubmitUserIdentityResponse struct {
-	IdentityID uuid.UUID `json:"identity_id"`
-	Message    string    `json:"message"`
+	IdentityID   uuid.UUID `json:"identity_id"`
+	SessionToken string    `json:"session_token"`
+	Message      string    `json:"message"`
 }
