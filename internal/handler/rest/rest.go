@@ -36,6 +36,16 @@ func (r *Rest) MountEndpoint() {
 	onboarding.POST("/identity", r.SubmitUserIdentity)
 	onboarding.POST("/business-profile", r.SubmitBusinessProfile)
 
+	evidence := baseURL.Group("/evidence")
+	evidence.Use(r.middleware.AuthenticateUser)
+	evidence.GET("/categories", r.GetEvidenceCategories)
+	evidence.GET("/summary", r.GetEvidenceSummary)
+	evidence.GET("/ai-reviews", r.GetEvidenceAIReviews)
+	evidence.GET("/categories/:category_id", r.GetEvidenceCategoryDetail)
+	evidence.POST("/categories/:category_id/documents", r.UploadEvidenceDocument)
+	evidence.PATCH("/documents/:evidence_id/ai-review", r.SubmitEvidenceAIReview)
+	evidence.PATCH("/ai-reviews/:review_id", r.ReviewEvidenceAI)
+
 }
 
 func (r *Rest) Run() {

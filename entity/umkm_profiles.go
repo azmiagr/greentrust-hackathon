@@ -21,8 +21,9 @@ type UMKMProfile struct {
 	CreatedAt              time.Time `json:"created_at" gorm:"type:timestamp"`
 	UpdatedAt              time.Time `json:"updated_at" gorm:"type:timestamp"`
 
-	GreenPassport  GreenPassport      `json:"green_passport" gorm:"foreignKey:ProfileID;constraint:onDelete:CASCADE"`
-	LocationPhotos []LocationPhoto    `json:"location_photos" gorm:"foreignKey:ProfileID;constraint:onDelete:CASCADE"`
-	UMKMProducts   []UMKMProduct      `json:"umkm_products" gorm:"foreignKey:ProfileID;constraint:onDelete:CASCADE"`
-	EvidenceDocs   []EvidenceDocument `json:"evidence_docs" gorm:"foreignKey:ProfileID;constraint:onDelete:CASCADE"`
+	GreenPassport     GreenPassport      `json:"green_passport" gorm:"foreignKey:ProfileID;constraint:onDelete:CASCADE"`
+	LocationPhotos    []LocationPhoto    `json:"location_photos" gorm:"foreignKey:ProfileID;constraint:onDelete:CASCADE"`
+	UMKMProducts      []UMKMProduct      `json:"umkm_products" gorm:"foreignKey:ProfileID;constraint:onDelete:CASCADE"`
+	EvidenceDocs      []EvidenceDocument `json:"evidence_docs" gorm:"foreignKey:ProfileID;constraint:onDelete:CASCADE"`
+	EvidenceAIReviews []EvidenceAIReview `json:"evidence_ai_reviews" gorm:"foreignKey:ProfileID;constraint:onDelete:CASCADE"`
 }

@@ -16,8 +16,11 @@ func Migrate(db *gorm.DB) error {
 		&entity.UMKMProfile{},
 		&entity.GreenPassport{},
 		&entity.LocationPhoto{},
-		&entity.EvidenceDocument{},
 		&entity.UMKMProduct{},
+		&entity.EvidenceCategory{},
+		&entity.EvidenceRequirement{},
+		&entity.EvidenceDocument{},
+		&entity.EvidenceAIReview{},
 	)
 
 	if err != nil {
