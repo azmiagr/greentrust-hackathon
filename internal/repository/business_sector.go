@@ -9,6 +9,7 @@ import (
 
 type IBusinessSectorRepository interface {
 	GetBusinessSector(tx *gorm.DB, param model.GetBusinessSectorParam) (*entity.BusinessSector, error)
+	GetBusinessSectors(tx *gorm.DB) ([]*entity.BusinessSector, error)
 }
 
 type BusinessSectorRepository struct {
@@ -27,4 +28,16 @@ func (r *BusinessSectorRepository) GetBusinessSector(tx *gorm.DB, param model.Ge
 	}
 
 	return &sector, nil
+}
+
+func (r *BusinessSectorRepository) GetBusinessSectors(tx *gorm.DB) ([]*entity.BusinessSector, error) {
+	var sectors []*entity.BusinessSector
+	err := tx.Debug().
+		Order("sector_name ASC").
+		Find(&sectors).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return sectors, nil
 }

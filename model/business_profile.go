@@ -22,6 +22,11 @@ type GetBusinessSectorParam struct {
 	SectorID uuid.UUID `json:"sector_id"`
 }
 
+type BusinessSectorResponse struct {
+	SectorID   uuid.UUID `json:"sector_id"`
+	SectorName string    `json:"sector_name"`
+}
+
 type GetUMKMProfileParam struct {
 	ProfileID uuid.UUID `json:"profile_id"`
 	UserID    uuid.UUID `json:"user_id"`
