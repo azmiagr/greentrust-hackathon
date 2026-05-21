@@ -25,6 +25,8 @@ import (
 
 type IGreenPassportService interface {
 	IssueGreenPassport(userID uuid.UUID) (*model.IssueGreenPassportResponse, error)
+	GetPublicUMKMDirectory(query model.PublicUMKMDirectoryQuery) (*model.PublicUMKMDirectoryResponse, error)
+	GetPublicUMKMDetail(profileID uuid.UUID) (*model.PublicUMKMDetailResponse, error)
 }
 
 type GreenPassportService struct {
@@ -51,6 +53,127 @@ func NewGreenPassportService(
 		blockchainClient: blockchainClient,
 		supabase:         supabaseClient,
 	}
+}
+
+func (s *GreenPassportService) GetPublicUMKMDirectory(query model.PublicUMKMDirectoryQuery) (*model.PublicUMKMDirectoryResponse, error) {
+	param, activeFilterCount, err := buildPublicUMKMDirectoryFiltersParam(query)
+	if err != nil {
+		return nil, err
+	}
+
+	items, err := s.umkmProfileRepo.GetPublicUMKMDirectoryItems(s.db, param)
+	if err != nil {
+		return nil, apperrors.InternalServer("failed to get public umkm directory")
+	}
+
+	total, err := s.umkmProfileRepo.CountPublicUMKMDirectoryItems(s.db, param)
+	if err != nil {
+		return nil, apperrors.InternalServer("failed to count public umkm directory")
+	}
+
+	sectors, err := s.umkmProfileRepo.GetPublicUMKMDirectorySectorFilters(s.db)
+	if err != nil {
+		return nil, apperrors.InternalServer("failed to get sector filters")
+	}
+
+	provinces, err := s.umkmProfileRepo.GetPublicUMKMDirectoryProvinceFilters(s.db)
+	if err != nil {
+		return nil, apperrors.InternalServer("failed to get province filters")
+	}
+
+	tiers, err := s.umkmProfileRepo.GetPublicUMKMDirectoryTierFilters(s.db)
+	if err != nil {
+		return nil, apperrors.InternalServer("failed to get tier filters")
+	}
+
+	return &model.PublicUMKMDirectoryResponse{
+		Meta: model.PublicUMKMDirectoryMeta{
+			Page:              param.Page,
+			Limit:             param.Limit,
+			Total:             int(total),
+			Showing:           len(items),
+			ActiveFilterCount: activeFilterCount,
+		},
+		Filters: model.PublicUMKMDirectoryFilters{
+			Sectors:   mapPublicUMKMSectorFilters(sectors),
+			Provinces: mapPublicUMKMProvinceFilters(provinces),
+			Tiers:     mapPublicUMKMTierFilters(tiers),
+		},
+		Items: mapPublicUMKMDirectoryItems(items),
+	}, nil
+}
+
+func (s *GreenPassportService) GetPublicUMKMDetail(profileID uuid.UUID) (*model.PublicUMKMDetailResponse, error) {
+	profile, err := s.umkmProfileRepo.GetUMKMProfile(s.db, model.GetUMKMProfileParam{ProfileID: profileID})
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperrors.NotFound("business profile not found")
+		}
+		return nil, apperrors.InternalServer("failed to get business profile")
+	}
+
+	passport, err := s.passportRepo.GetActiveByProfileID(s.db, profileID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperrors.NotFound("active green passport not found")
+		}
+		return nil, apperrors.InternalServer("failed to get green passport")
+	}
+
+	directoryRow, err := s.umkmProfileRepo.GetPublicUMKMDirectoryItemByProfileID(s.db, profileID.String())
+	if err != nil {
+		return nil, apperrors.InternalServer("failed to get public profile metadata")
+	}
+
+	categories, err := s.evidenceRepo.GetEvidenceCategoriesWithDocuments(s.db, profileID)
+	if err != nil {
+		return nil, apperrors.InternalServer("failed to get evidence categories")
+	}
+
+	tier, tierLabel := buildPublicUMKMTier(passport.GRSScore)
+	categoryResponses, verifiedDocumentCount := mapPublicUMKMDetailCategories(categories)
+
+	photoURL := directoryRow.PhotoURL
+	sectorName := directoryRow.SectorName
+	if sectorName == "" {
+		sectorName = profile.SectorID.String()
+	}
+
+	return &model.PublicUMKMDetailResponse{
+		Profile: model.PublicUMKMDetailProfile{
+			ProfileID:      profile.ProfileID,
+			BusinessName:   profile.BusinessName,
+			SectorName:     sectorName,
+			Province:       profile.BusinessProvince,
+			City:           profile.BusinessCity,
+			Description:    profile.BusinessDescription,
+			PhotoURL:       photoURL,
+			WhatsappNumber: profile.WhatsappNumber,
+		},
+		GreenPassport: model.PublicGreenPassportDetail{
+			PassportID:       passport.PassportID,
+			PublicSlug:       passport.PublicSlug,
+			PassportURL:      buildPassportURL(passport.PublicSlug),
+			QRCodeURL:        passport.QRCodeURL,
+			GRSScore:         passport.GRSScore,
+			Tier:             tier,
+			TierLabel:        tierLabel,
+			Status:           passport.Status,
+			IssuedAt:         passport.IssuedAt,
+			LastUpdatedAt:    passport.LastUpdatedAt,
+			BlockchainTxHash: passport.BlockchainTxHash,
+			ContractAddress:  passport.ContractAddress,
+			Network:          passport.NetworkName,
+			ChainID:          passport.ChainID,
+			BlockNumber:      passport.BlockNumber,
+		},
+		Summary: model.PublicUMKMDetailSummary{
+			VerifiedDocumentCount: verifiedDocumentCount,
+			PrivateDocumentCount:  0,
+			CategoryCount:         len(categoryResponses),
+		},
+		Categories: categoryResponses,
+	}, nil
 }
 
 func (s *GreenPassportService) IssueGreenPassport(userID uuid.UUID) (*model.IssueGreenPassportResponse, error) {
@@ -237,6 +360,242 @@ func mapGreenPassportCategoryScores(breakdown entity.GRSBreakdown) []model.Green
 	}
 
 	return scores
+}
+
+func buildPublicUMKMDirectoryFiltersParam(query model.PublicUMKMDirectoryQuery) (model.PublicUMKMDirectoryFiltersParam, int, error) {
+	page := query.Page
+	if page <= 0 {
+		page = 1
+	}
+
+	limit := query.Limit
+	if limit <= 0 {
+		limit = 12
+	}
+	if limit > 50 {
+		limit = 50
+	}
+
+	sort := strings.TrimSpace(query.Sort)
+	if sort == "" {
+		sort = "grs_desc"
+	}
+	switch sort {
+	case "grs_desc", "grs_asc", "newest", "name_asc":
+	default:
+		return model.PublicUMKMDirectoryFiltersParam{}, 0, apperrors.BadRequest("sort must be grs_desc, grs_asc, newest, or name_asc")
+	}
+
+	sectorIDs := splitCSV(query.SectorIDs)
+	for _, sectorID := range sectorIDs {
+		if _, err := uuid.Parse(sectorID); err != nil {
+			return model.PublicUMKMDirectoryFiltersParam{}, 0, apperrors.BadRequest("sector_ids must contain valid uuid values")
+		}
+	}
+
+	tiers := splitCSV(query.Tiers)
+	for _, tier := range tiers {
+		switch tier {
+		case "unggul", "siap", "hampir":
+		default:
+			return model.PublicUMKMDirectoryFiltersParam{}, 0, apperrors.BadRequest("tiers must contain unggul, siap, or hampir")
+		}
+	}
+
+	param := model.PublicUMKMDirectoryFiltersParam{
+		Search:    strings.TrimSpace(query.Search),
+		SectorIDs: sectorIDs,
+		Tiers:     tiers,
+		Provinces: splitCSVPreserveCase(query.Provinces),
+		Sort:      sort,
+		Page:      page,
+		Limit:     limit,
+		Offset:    (page - 1) * limit,
+	}
+
+	activeFilterCount := 0
+	if param.Search != "" {
+		activeFilterCount++
+	}
+	activeFilterCount += len(param.SectorIDs)
+	activeFilterCount += len(param.Tiers)
+	activeFilterCount += len(param.Provinces)
+
+	return param, activeFilterCount, nil
+}
+
+func splitCSV(input string) []string {
+	parts := strings.Split(input, ",")
+	values := make([]string, 0, len(parts))
+	seen := map[string]bool{}
+	for _, part := range parts {
+		value := strings.ToLower(strings.TrimSpace(part))
+		if value == "" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		values = append(values, value)
+	}
+
+	return values
+}
+
+func splitCSVPreserveCase(input string) []string {
+	parts := strings.Split(input, ",")
+	values := make([]string, 0, len(parts))
+	seen := map[string]bool{}
+	for _, part := range parts {
+		value := strings.TrimSpace(part)
+		key := strings.ToLower(value)
+		if value == "" || seen[key] {
+			continue
+		}
+		seen[key] = true
+		values = append(values, value)
+	}
+
+	return values
+}
+
+func mapPublicUMKMDirectoryItems(rows []model.PublicUMKMDirectoryRow) []model.PublicUMKMDirectoryItem {
+	items := make([]model.PublicUMKMDirectoryItem, 0, len(rows))
+	for _, row := range rows {
+		profileID, err := uuid.Parse(row.ProfileID)
+		if err != nil {
+			continue
+		}
+		passportID, err := uuid.Parse(row.PassportID)
+		if err != nil {
+			continue
+		}
+
+		tier, tierLabel := buildPublicUMKMTier(row.GRSScore)
+		items = append(items, model.PublicUMKMDirectoryItem{
+			ProfileID:            profileID,
+			BusinessName:         row.BusinessName,
+			SectorName:           row.SectorName,
+			Province:             row.Province,
+			City:                 row.City,
+			Description:          row.Description,
+			PhotoURL:             row.PhotoURL,
+			GRSScore:             row.GRSScore,
+			Tier:                 tier,
+			TierLabel:            tierLabel,
+			OnChainDocumentCount: int(row.OnChainDocumentCount),
+			GreenPassport: model.PublicGreenPassportBrief{
+				PassportID:       passportID,
+				PublicSlug:       row.PublicSlug,
+				PassportURL:      buildPassportURL(row.PublicSlug),
+				Status:           row.PassportStatus,
+				IssuedAt:         row.IssuedAt,
+				BlockchainTxHash: row.BlockchainTxHash,
+			},
+		})
+	}
+
+	return items
+}
+
+func mapPublicUMKMDetailCategories(categories []*entity.EvidenceCategory) ([]model.PublicUMKMDetailEvidenceCategory, int) {
+	responses := make([]model.PublicUMKMDetailEvidenceCategory, 0, len(categories))
+	verifiedDocumentCount := 0
+
+	for _, category := range categories {
+		progress := buildCategoryProgress(category)
+		progressPercent := 0.0
+		if progress.RequiredCount > 0 {
+			progressPercent = roundScore((float64(progress.FulfilledCount) / float64(progress.RequiredCount)) * 100)
+		}
+
+		documents := make([]model.PublicUMKMDetailEvidenceDocument, 0)
+		for _, requirement := range category.Requirements {
+			for _, document := range requirement.EvidenceDocuments {
+				if document.Status == "on_chain" {
+					verifiedDocumentCount++
+				}
+
+				documents = append(documents, model.PublicUMKMDetailEvidenceDocument{
+					EvidenceID:       document.EvidenceID,
+					RequirementID:    document.RequirementID,
+					FileName:         document.OriginalName,
+					FileHash:         document.FileHash,
+					MimeType:         document.MimeType,
+					FileSize:         document.FileSize,
+					Status:           document.Status,
+					BlockchainTxHash: document.BlockchainTxHash,
+					CreatedAt:        document.CreatedAt,
+				})
+			}
+		}
+
+		responses = append(responses, model.PublicUMKMDetailEvidenceCategory{
+			CategoryID:      category.CategoryID,
+			Code:            category.CategoryID,
+			Name:            category.Name,
+			Weight:          category.Weight,
+			RequiredCount:   progress.RequiredCount,
+			FulfilledCount:  progress.FulfilledCount,
+			ProgressPercent: progressPercent,
+			Score:           progress.Score,
+			Status:          progress.Status,
+			Documents:       documents,
+		})
+	}
+
+	return responses, verifiedDocumentCount
+}
+
+func mapPublicUMKMSectorFilters(rows []model.PublicUMKMSectorFilterRow) []model.PublicUMKMSectorFilter {
+	filters := make([]model.PublicUMKMSectorFilter, 0, len(rows))
+	for _, row := range rows {
+		sectorID, err := uuid.Parse(row.SectorID)
+		if err != nil {
+			continue
+		}
+		filters = append(filters, model.PublicUMKMSectorFilter{
+			SectorID:   sectorID,
+			SectorName: row.SectorName,
+			Count:      int(row.Count),
+		})
+	}
+
+	return filters
+}
+
+func mapPublicUMKMProvinceFilters(rows []model.PublicUMKMProvinceFilterRow) []model.PublicUMKMProvinceFilter {
+	filters := make([]model.PublicUMKMProvinceFilter, 0, len(rows))
+	for _, row := range rows {
+		filters = append(filters, model.PublicUMKMProvinceFilter{
+			Name:  row.Name,
+			Count: int(row.Count),
+		})
+	}
+
+	return filters
+}
+
+func mapPublicUMKMTierFilters(rows []model.PublicUMKMTierFilterRow) []model.PublicUMKMTierFilter {
+	counts := map[string]int{}
+	for _, row := range rows {
+		counts[row.Tier] = int(row.Count)
+	}
+
+	return []model.PublicUMKMTierFilter{
+		{Tier: "unggul", Label: "Unggul", MinScore: 85, MaxScore: 100, Count: counts["unggul"]},
+		{Tier: "siap", Label: "Siap", MinScore: 70, MaxScore: 84, Count: counts["siap"]},
+		{Tier: "hampir", Label: "Hampir", MinScore: 0, MaxScore: 69, Count: counts["hampir"]},
+	}
+}
+
+func buildPublicUMKMTier(score float64) (string, string) {
+	switch {
+	case score >= 85:
+		return "unggul", "Unggul"
+	case score >= 70:
+		return "siap", "Siap"
+	default:
+		return "hampir", "Hampir"
+	}
 }
 
 func getEnvWithDefault(key string, fallback string) string {

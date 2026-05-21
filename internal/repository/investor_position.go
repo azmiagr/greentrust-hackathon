@@ -12,6 +12,8 @@ type IInvestorPositionRepository interface {
 	GetInvestorPositionsByProfileID(tx *gorm.DB, profileID uuid.UUID) ([]*entity.InvestorPosition, error)
 	GetInvestorPositionByIDAndProfileID(tx *gorm.DB, positionID uuid.UUID, profileID uuid.UUID) (*entity.InvestorPosition, error)
 	UpdateInvestorPosition(tx *gorm.DB, position *entity.InvestorPosition) error
+	ReplaceInvestorPositionSkills(tx *gorm.DB, position *entity.InvestorPosition, skills []entity.Skill) error
+	ClearInvestorPositionSkills(tx *gorm.DB, position *entity.InvestorPosition) error
 	DeleteInvestorPosition(tx *gorm.DB, position *entity.InvestorPosition) error
 }
 
@@ -61,6 +63,24 @@ func (r *InvestorPositionRepository) GetInvestorPositionByIDAndProfileID(tx *gor
 
 func (r *InvestorPositionRepository) UpdateInvestorPosition(tx *gorm.DB, position *entity.InvestorPosition) error {
 	err := tx.Debug().Save(position).Error
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *InvestorPositionRepository) ReplaceInvestorPositionSkills(tx *gorm.DB, position *entity.InvestorPosition, skills []entity.Skill) error {
+	err := tx.Debug().Model(position).Association("Skills").Replace(skills)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *InvestorPositionRepository) ClearInvestorPositionSkills(tx *gorm.DB, position *entity.InvestorPosition) error {
+	err := tx.Debug().Model(position).Association("Skills").Clear()
 	if err != nil {
 		return err
 	}

@@ -26,17 +26,21 @@ func NewRest(service *service.Service, middleware middleware.Interface) *Rest {
 func (r *Rest) MountEndpoint() {
 	r.router.Use(r.middleware.Cors())
 	baseURL := r.router.Group("/api/v1")
+	baseURL.GET("/sectors", r.GetBusinessSectors)
+	baseURL.GET("/umkms", r.GetPublicUMKMDirectory)
+	baseURL.GET("/umkms/:profile_id", r.GetPublicUMKMDetail)
+	baseURL.GET("/investors", r.GetPublicInvestors)
+	baseURL.GET("/investors/:profile_id", r.GetPublicInvestorDetail)
 
 	auth := baseURL.Group("/auth")
 	auth.POST("/register", r.RegisterUser)
 	auth.POST("/verify-otp", r.VerifyOTP)
 	auth.POST("/login", r.LoginUser)
 
-	baseURL.GET("/sectors", r.GetBusinessSectors)
-
 	onboarding := baseURL.Group("/onboarding")
 	onboarding.POST("/identity", r.SubmitUserIdentity)
 	onboarding.POST("/business-profile", r.SubmitBusinessProfile)
+	onboarding.POST("/investor/profile", r.SubmitOnboardingInvestorProfile)
 	onboarding.POST("/investor/positions", r.CreateOnboardingInvestorPosition)
 	onboarding.GET("/investor/positions", r.GetOnboardingInvestorPositions)
 	onboarding.PUT("/investor/positions/:position_id", r.UpdateOnboardingInvestorPosition)
@@ -45,11 +49,19 @@ func (r *Rest) MountEndpoint() {
 
 	investor := baseURL.Group("/investor")
 	investor.Use(r.middleware.AuthenticateUser)
+	investor.GET("/dashboard", r.GetInvestorDashboard)
+	investor.GET("/profile", r.GetInvestorProfile)
+	investor.GET("/portfolio", r.GetInvestorPortfolio)
+	investor.GET("/proposals", r.GetInvestorProposals)
 	investor.POST("/positions", r.CreateInvestorPosition)
 	investor.GET("/positions", r.GetInvestorPositions)
 	investor.PUT("/positions/:position_id", r.UpdateInvestorPosition)
 	investor.DELETE("/positions/:position_id", r.DeleteInvestorPosition)
 	investor.GET("/skills", r.SearchSkills)
+
+	umkm := baseURL.Group("/umkm")
+	umkm.Use(r.middleware.AuthenticateUser)
+	umkm.GET("/proposals", r.GetUMKMProposals)
 
 	evidence := baseURL.Group("/evidence")
 	evidence.Use(r.middleware.AuthenticateUser)

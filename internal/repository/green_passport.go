@@ -9,6 +9,7 @@ import (
 
 type IGreenPassportRepository interface {
 	GetByProfileID(tx *gorm.DB, profileID uuid.UUID) (*entity.GreenPassport, error)
+	GetActiveByProfileID(tx *gorm.DB, profileID uuid.UUID) (*entity.GreenPassport, error)
 	UpsertPassport(tx *gorm.DB, passport *entity.GreenPassport) error
 }
 
@@ -21,6 +22,17 @@ func NewGreenPassportRepository(db *gorm.DB) IGreenPassportRepository {
 func (r *GreenPassportRepository) GetByProfileID(tx *gorm.DB, profileID uuid.UUID) (*entity.GreenPassport, error) {
 	var passport entity.GreenPassport
 	err := tx.Debug().Where("profile_id = ?", profileID).First(&passport).Error
+	if err != nil {
+		return nil, err
+	}
+	return &passport, nil
+}
+
+func (r *GreenPassportRepository) GetActiveByProfileID(tx *gorm.DB, profileID uuid.UUID) (*entity.GreenPassport, error) {
+	var passport entity.GreenPassport
+	err := tx.Debug().
+		Where("profile_id = ? AND status = ?", profileID, "active").
+		First(&passport).Error
 	if err != nil {
 		return nil, err
 	}
