@@ -17,3 +17,12 @@ type RegisterResponse struct {
 	SessionToken string `json:"session_token"`
 	Message      string `json:"message"`
 }
+
+type LoginUserParam struct {
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password" binding:"required"`
+}
+
+type LoginResponse struct {
+	Token string `json:"token"`
+}

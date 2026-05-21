@@ -30,6 +30,7 @@ func (r *Rest) MountEndpoint() {
 	auth := baseURL.Group("/auth")
 	auth.POST("/register", r.RegisterUser)
 	auth.POST("/verify-otp", r.VerifyOTP)
+	auth.POST("/login", r.LoginUser)
 
 	onboarding := baseURL.Group("/onboarding")
 	onboarding.POST("/identity", r.SubmitUserIdentity)

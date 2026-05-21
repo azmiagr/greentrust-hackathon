@@ -2,11 +2,13 @@ package jwt
 
 import (
 	"errors"
+	"greentrust-hackathon/entity"
 	"log"
 	"os"
 	"strconv"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 )
@@ -16,6 +18,7 @@ type Interface interface {
 	ValidateToken(tokenString string) (uuid.UUID, error)
 	CreateRegistrationSessionToken(email string, userID *uuid.UUID, verified bool, identityCompleted bool) (string, error)
 	ValidateRegistrationSessionToken(tokenString string) (*RegistrationSessionClaims, error)
+	GetLoginUser(c *gin.Context) (*entity.User, error)
 }
 
 type jsonWebToken struct {
@@ -128,4 +131,13 @@ func (j *jsonWebToken) ValidateRegistrationSessionToken(tokenString string) (*Re
 	}
 
 	return &claims, nil
+}
+
+func (j *jsonWebToken) GetLoginUser(c *gin.Context) (*entity.User, error) {
+	user, ok := c.Get("user")
+	if !ok {
+		return &entity.User{}, errors.New("failed to get user login")
+	}
+
+	return user.(*entity.User), nil
 }
