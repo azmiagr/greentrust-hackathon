@@ -14,7 +14,7 @@ import (
 type Interface interface {
 	CreateJWTToken(userID uuid.UUID, roleName string) (string, error)
 	ValidateToken(tokenString string) (uuid.UUID, error)
-	CreateRegistrationSessionToken(email string, userID *uuid.UUID, verified bool) (string, error)
+	CreateRegistrationSessionToken(email string, userID *uuid.UUID, verified bool, identityCompleted bool) (string, error)
 	ValidateRegistrationSessionToken(tokenString string) (*RegistrationSessionClaims, error)
 }
 
@@ -24,10 +24,11 @@ type jsonWebToken struct {
 }
 
 type RegistrationSessionClaims struct {
-	Email    string     `json:"email"`
-	UserID   *uuid.UUID `json:"user_id,omitempty"`
-	Verified bool       `json:"verified"`
-	Purpose  string     `json:"purpose"`
+	Email             string     `json:"email"`
+	UserID            *uuid.UUID `json:"user_id,omitempty"`
+	Verified          bool       `json:"verified"`
+	IdentityCompleted bool       `json:"identity_completed"`
+	Purpose           string     `json:"purpose"`
 	jwt.RegisteredClaims
 }
 
@@ -90,12 +91,13 @@ func (j *jsonWebToken) ValidateToken(tokenString string) (uuid.UUID, error) {
 	return userID, nil
 }
 
-func (j *jsonWebToken) CreateRegistrationSessionToken(email string, userID *uuid.UUID, verified bool) (string, error) {
+func (j *jsonWebToken) CreateRegistrationSessionToken(email string, userID *uuid.UUID, verified bool, identityCompleted bool) (string, error) {
 	claims := RegistrationSessionClaims{
-		Email:    email,
-		UserID:   userID,
-		Verified: verified,
-		Purpose:  "registration_session",
+		Email:             email,
+		UserID:            userID,
+		Verified:          verified,
+		IdentityCompleted: identityCompleted,
+		Purpose:           "registration_session",
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),

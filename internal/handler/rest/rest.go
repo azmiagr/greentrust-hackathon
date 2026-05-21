@@ -33,6 +33,7 @@ func (r *Rest) MountEndpoint() {
 
 	onboarding := baseURL.Group("/onboarding")
 	onboarding.POST("/identity", r.SubmitUserIdentity)
+	onboarding.POST("/business-profile", r.SubmitBusinessProfile)
 
 }
 
