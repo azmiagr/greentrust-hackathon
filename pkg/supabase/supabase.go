@@ -7,6 +7,7 @@ import (
 	"mime/multipart"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/google/uuid"
 	storage_go "github.com/supabase-community/storage-go"
@@ -28,6 +29,7 @@ type Interface interface {
 	DeleteFileByPath(filePath string) error
 	DeleteMultipleFiles(fileURLs []string) error
 	UploadWebP(data []byte, folder string) (string, error)
+	UploadEvidenceFile(file *multipart.FileHeader) (string, error)
 }
 
 func Init() Interface {
@@ -210,4 +212,19 @@ func (s Supabase) UploadWebP(data []byte, folder string) (string, error) {
 	)
 
 	return publicURL, nil
+}
+
+func (s Supabase) UploadEvidenceFile(file *multipart.FileHeader) (string, error) {
+	ext := strings.ToLower(filepath.Ext(file.Filename))
+
+	if ext == ".pdf" {
+		return s.UploadPDF(file)
+	}
+
+	switch ext {
+	case ".jpg", ".jpeg", ".png", ".webp":
+		return s.UploadFile(file)
+	default:
+		return "", fmt.Errorf("unsupported evidence file type")
+	}
 }

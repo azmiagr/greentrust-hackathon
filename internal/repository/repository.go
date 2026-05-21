@@ -11,6 +11,7 @@ type Repository struct {
 	BusinessSectorRepository IBusinessSectorRepository
 	LocationPhotoRepository  ILocationPhotoRepository
 	UMKMProfileRepository    IUMKMProfileRepository
+	EvidenceRepository       IEvidenceRepository
 }
 
 func NewRepository(db *gorm.DB) *Repository {
@@ -21,5 +22,6 @@ func NewRepository(db *gorm.DB) *Repository {
 		BusinessSectorRepository: NewBusinessSectorRepository(db),
 		LocationPhotoRepository:  NewLocationPhotoRepository(db),
 		UMKMProfileRepository:    NewUMKMProfileRepository(db),
+		EvidenceRepository:       NewEvidenceRepository(db),
 	}
 }
