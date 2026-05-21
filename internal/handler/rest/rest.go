@@ -35,6 +35,19 @@ func (r *Rest) MountEndpoint() {
 	onboarding := baseURL.Group("/onboarding")
 	onboarding.POST("/identity", r.SubmitUserIdentity)
 	onboarding.POST("/business-profile", r.SubmitBusinessProfile)
+	onboarding.POST("/investor/positions", r.CreateOnboardingInvestorPosition)
+	onboarding.GET("/investor/positions", r.GetOnboardingInvestorPositions)
+	onboarding.PUT("/investor/positions/:position_id", r.UpdateOnboardingInvestorPosition)
+	onboarding.DELETE("/investor/positions/:position_id", r.DeleteOnboardingInvestorPosition)
+	onboarding.GET("/investor/skills", r.SearchSkills)
+
+	investor := baseURL.Group("/investor")
+	investor.Use(r.middleware.AuthenticateUser)
+	investor.POST("/positions", r.CreateInvestorPosition)
+	investor.GET("/positions", r.GetInvestorPositions)
+	investor.PUT("/positions/:position_id", r.UpdateInvestorPosition)
+	investor.DELETE("/positions/:position_id", r.DeleteInvestorPosition)
+	investor.GET("/skills", r.SearchSkills)
 
 	evidence := baseURL.Group("/evidence")
 	evidence.Use(r.middleware.AuthenticateUser)
@@ -49,6 +62,17 @@ func (r *Rest) MountEndpoint() {
 	greenPassport := baseURL.Group("/green-passports")
 	greenPassport.Use(r.middleware.AuthenticateUser)
 	greenPassport.POST("/issue", r.IssueGreenPassport)
+
+	proposals := baseURL.Group("/proposals")
+	proposals.Use(r.middleware.AuthenticateUser)
+	proposals.POST("", r.CreateProposal)
+	proposals.GET("", r.GetProposals)
+	proposals.GET("/:proposal_id", r.GetProposalDetail)
+	proposals.PUT("/:proposal_id", r.UpdateProposal)
+	proposals.POST("/:proposal_id/send", r.SendProposal)
+	proposals.POST("/:proposal_id/accept", r.AcceptProposal)
+	proposals.POST("/:proposal_id/reject", r.RejectProposal)
+	proposals.POST("/:proposal_id/withdraw", r.WithdrawProposal)
 
 }
 
