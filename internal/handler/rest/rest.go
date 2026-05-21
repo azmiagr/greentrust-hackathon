@@ -46,6 +46,10 @@ func (r *Rest) MountEndpoint() {
 	evidence.PATCH("/documents/:evidence_id/ai-review", r.SubmitEvidenceAIReview)
 	evidence.PATCH("/ai-reviews/:review_id", r.ReviewEvidenceAI)
 
+	greenPassport := baseURL.Group("/green-passports")
+	greenPassport.Use(r.middleware.AuthenticateUser)
+	greenPassport.POST("/issue", r.IssueGreenPassport)
+
 }
 
 func (r *Rest) Run() {

@@ -5,6 +5,7 @@ import (
 	"greentrust-hackathon/pkg/helper"
 	"greentrust-hackathon/pkg/response"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -56,6 +57,18 @@ func (r *Rest) UploadEvidenceDocument(c *gin.Context) {
 		return
 	}
 
+	aiConfidenceStr := c.PostForm("ai_confidence")
+	if aiConfidenceStr == "" {
+		response.Error(c, http.StatusBadRequest, "ai_confidence is required", nil)
+		return
+	}
+
+	aiConfidence, err := strconv.ParseFloat(aiConfidenceStr, 64)
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "ai_confidence must be a valid float64", err)
+		return
+	}
+
 	file, err := c.FormFile("document")
 	if err != nil {
 		response.Error(c, http.StatusBadRequest, "document is required", err)
@@ -66,6 +79,7 @@ func (r *Rest) UploadEvidenceDocument(c *gin.Context) {
 		CategoryID:    categoryID,
 		RequirementID: requirementID,
 		File:          file,
+		AIConfidence:  aiConfidence,
 	})
 	if err != nil {
 		response.HandleError(c, err)

@@ -22,6 +22,9 @@ type IEvidenceRepository interface {
 	CreateAIReview(tx *gorm.DB, review *entity.EvidenceAIReview) error
 	UpdateAIReview(tx *gorm.DB, review *entity.EvidenceAIReview) error
 	GetEvidenceDocumentsByIDs(tx *gorm.DB, evidenceIDs []uuid.UUID) ([]*entity.EvidenceDocument, error)
+	GetReviewedEvidenceDocumentsByProfileID(tx *gorm.DB, profileID uuid.UUID) ([]*entity.EvidenceDocument, error)
+	MarkDocumentsOnChain(tx *gorm.DB, profileID uuid.UUID, txHash string) error
+	MarkDocumentsBlockchainFailed(tx *gorm.DB, profileID uuid.UUID) error
 }
 
 type EvidenceRepository struct {
@@ -211,5 +214,36 @@ func (r *EvidenceRepository) UpdateAIReview(tx *gorm.DB, review *entity.Evidence
 		return err
 	}
 
+	return nil
+}
+
+func (r *EvidenceRepository) GetReviewedEvidenceDocumentsByProfileID(tx *gorm.DB, profileID uuid.UUID) ([]*entity.EvidenceDocument, error) {
+	var docs []*entity.EvidenceDocument
+	err := tx.Where("profile_id = ? AND status IN ?", profileID, []string{"reviewed", "on_chain"}).
+		Order("created_at ASC").Find(&docs).Error
+
+	if err != nil {
+		return nil, err
+	}
+	return docs, nil
+}
+
+func (r *EvidenceRepository) MarkDocumentsOnChain(tx *gorm.DB, profileID uuid.UUID, txHash string) error {
+	err := tx.Model(&entity.EvidenceDocument{}).
+		Where("profile_id = ? AND status = ?", profileID, "reviewed").
+		Updates(map[string]any{"status": "on_chain", "blockchain_tx_hash": txHash}).Error
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *EvidenceRepository) MarkDocumentsBlockchainFailed(tx *gorm.DB, profileID uuid.UUID) error {
+	err := tx.Model(&entity.EvidenceDocument{}).
+		Where("profile_id = ? AND status = ?", profileID, "reviewed").
+		Update("status", "blockchain_failed").Error
+	if err != nil {
+		return err
+	}
 	return nil
 }

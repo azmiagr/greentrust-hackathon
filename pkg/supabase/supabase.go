@@ -30,6 +30,7 @@ type Interface interface {
 	DeleteMultipleFiles(fileURLs []string) error
 	UploadWebP(data []byte, folder string) (string, error)
 	UploadEvidenceFile(file *multipart.FileHeader) (string, error)
+	UploadBytes(data []byte, path string, contentType string, cacheControl string) (string, error)
 }
 
 func Init() Interface {
@@ -227,4 +228,43 @@ func (s Supabase) UploadEvidenceFile(file *multipart.FileHeader) (string, error)
 	default:
 		return "", fmt.Errorf("unsupported evidence file type")
 	}
+}
+
+func (s Supabase) UploadBytes(data []byte, path string, contentType string, cacheControl string) (string, error) {
+	if len(data) == 0 {
+		return "", fmt.Errorf("file data cannot be empty")
+	}
+
+	if strings.TrimSpace(path) == "" {
+		return "", fmt.Errorf("file path cannot be empty")
+	}
+
+	if strings.TrimSpace(contentType) == "" {
+		contentType = "application/octet-stream"
+	}
+
+	if strings.TrimSpace(cacheControl) == "" {
+		cacheControl = "31536000"
+	}
+
+	_, err := s.client.UploadFile(
+		os.Getenv("SUPABASE_BUCKET"),
+		path,
+		bytes.NewReader(data),
+		storage_go.FileOptions{
+			ContentType:  &contentType,
+			CacheControl: &cacheControl,
+		},
+	)
+	if err != nil {
+		return "", err
+	}
+
+	publicURL := fmt.Sprintf("%s/storage/v1/object/public/%s/%s",
+		os.Getenv("SUPABASE_URL"),
+		os.Getenv("SUPABASE_BUCKET"),
+		path,
+	)
+
+	return publicURL, nil
 }

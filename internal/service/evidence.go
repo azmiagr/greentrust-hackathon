@@ -195,6 +195,7 @@ func (s *EvidenceService) UploadEvidenceDocument(userID uuid.UUID, param model.U
 		RequirementID: &param.RequirementID,
 		FilePath:      fileURL,
 		FileHash:      fileHash,
+		AiConfidence:  param.AIConfidence,
 		OriginalName:  param.File.Filename,
 		MimeType:      param.File.Header.Get("Content-Type"),
 		FileSize:      param.File.Size,
