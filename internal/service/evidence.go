@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"greentrust-hackathon/entity"
 	"greentrust-hackathon/internal/repository"
 	"greentrust-hackathon/model"
@@ -13,6 +14,7 @@ import (
 	"io"
 	"math"
 	"mime/multipart"
+	"sort"
 	"strings"
 	"time"
 
@@ -81,10 +83,12 @@ func (s *EvidenceService) GetEvidenceSummary(userID uuid.UUID) (*model.EvidenceS
 	}
 
 	return &model.EvidenceSummaryResponse{
-		GRSScore:          roundScore(totalScore),
-		PassportThreshold: evidencePassportThreshold,
-		PassportStatus:    passportStatus,
-		Categories:        categoryProgress,
+		GRSScore:            roundScore(totalScore),
+		PassportThreshold:   evidencePassportThreshold,
+		PassportStatus:      passportStatus,
+		Categories:          categoryProgress,
+		OnChainDocuments:    buildEvidenceOnChainDocuments(categories),
+		NextRecommendations: buildEvidenceNextRecommendations(categories, "", 2),
 	}, nil
 }
 
@@ -134,11 +138,19 @@ func (s *EvidenceService) GetEvidenceCategoryDetail(userID uuid.UUID, categoryID
 		}
 	}
 
+	categories, err := s.evidenceRepo.GetEvidenceCategoriesWithDocuments(s.db, profile.ProfileID)
+	if err != nil {
+		return nil, apperrors.InternalServer("failed to get evidence categories")
+	}
+
+	nextRecommendations := buildEvidenceNextRecommendations(categories, categoryID, 2)
+
 	return &model.EvidenceCategoryDetailResponse{
-		Category:     categoryProgress,
-		Requirements: requirements,
-		Documents:    documents,
-		NextPriority: []model.EvidenceCategoryProgress{},
+		Category:            categoryProgress,
+		Requirements:        requirements,
+		Documents:           documents,
+		NextPriority:        mapEvidenceRecommendationProgress(nextRecommendations),
+		NextRecommendations: nextRecommendations,
 	}, nil
 }
 
@@ -199,7 +211,7 @@ func (s *EvidenceService) UploadEvidenceDocument(userID uuid.UUID, param model.U
 		OriginalName:  param.File.Filename,
 		MimeType:      param.File.Header.Get("Content-Type"),
 		FileSize:      param.File.Size,
-		Status:        "uploaded",
+		Status:        "reviewed",
 	}
 
 	err = s.evidenceRepo.CreateEvidenceDocument(tx, doc)
@@ -533,15 +545,11 @@ func (s *EvidenceService) getProfileByUserID(tx *gorm.DB, userID uuid.UUID) (*en
 }
 
 func buildCategoryProgress(category *entity.EvidenceCategory) model.EvidenceCategoryProgress {
-	requiredCount := 0
+	requirementCount := 0
 	fulfilledCount := 0
 
 	for _, requirement := range category.Requirements {
-		if !requirement.IsRequired {
-			continue
-		}
-
-		requiredCount++
+		requirementCount++
 
 		if hasFulfilledDocument(requirement.EvidenceDocuments) {
 			fulfilledCount++
@@ -549,8 +557,8 @@ func buildCategoryProgress(category *entity.EvidenceCategory) model.EvidenceCate
 	}
 
 	score := 0.0
-	if requiredCount > 0 {
-		score = (float64(fulfilledCount) / float64(requiredCount)) * category.Weight
+	if requirementCount > 0 {
+		score = (float64(fulfilledCount) / float64(requirementCount)) * category.Weight
 	}
 
 	return model.EvidenceCategoryProgress{
@@ -558,11 +566,169 @@ func buildCategoryProgress(category *entity.EvidenceCategory) model.EvidenceCate
 		Code:           category.CategoryID,
 		Name:           category.Name,
 		Weight:         category.Weight,
-		RequiredCount:  requiredCount,
+		RequiredCount:  requirementCount,
 		FulfilledCount: fulfilledCount,
 		Score:          roundScore(score),
-		Status:         buildCategoryStatus(requiredCount, fulfilledCount),
+		Status:         buildCategoryStatus(requirementCount, fulfilledCount),
 	}
+}
+
+func buildEvidenceOnChainDocuments(categories []*entity.EvidenceCategory) model.EvidenceOnChainDocuments {
+	total := 0
+	items := make([]model.EvidenceOnChainDocument, 0)
+
+	for _, category := range categories {
+		if category == nil {
+			continue
+		}
+
+		for _, requirement := range category.Requirements {
+			total++
+
+			for _, document := range requirement.EvidenceDocuments {
+				if document.Status != "on_chain" {
+					continue
+				}
+
+				items = append(items, model.EvidenceOnChainDocument{
+					EvidenceID:       document.EvidenceID,
+					CategoryID:       category.CategoryID,
+					CategoryName:     category.Name,
+					RequirementID:    document.RequirementID,
+					RequirementName:  requirement.Name,
+					FileName:         document.OriginalName,
+					FilePath:         document.FilePath,
+					FileHash:         document.FileHash,
+					MimeType:         document.MimeType,
+					FileSize:         document.FileSize,
+					BlockchainTxHash: document.BlockchainTxHash,
+					CreatedAt:        document.CreatedAt,
+					UpdatedAt:        document.UpdatedAt,
+				})
+			}
+		}
+	}
+
+	percentage := 0.0
+	if total > 0 {
+		percentage = roundScore((float64(len(items)) / float64(total)) * 100)
+	}
+
+	return model.EvidenceOnChainDocuments{
+		Count:      len(items),
+		Total:      total,
+		Percentage: percentage,
+		Items:      items,
+	}
+}
+
+type evidenceRecommendationCandidate struct {
+	recommendation model.EvidenceNextRecommendation
+	sortOrder      int
+}
+
+func buildEvidenceNextRecommendations(categories []*entity.EvidenceCategory, excludedCategoryID string, limit int) []model.EvidenceNextRecommendation {
+	excludedCategoryID = strings.ToUpper(strings.TrimSpace(excludedCategoryID))
+	candidates := make([]evidenceRecommendationCandidate, 0, len(categories))
+
+	for _, category := range categories {
+		if category == nil || category.CategoryID == excludedCategoryID {
+			continue
+		}
+
+		progress := buildCategoryProgress(category)
+		potentialGain := roundScore(category.Weight - progress.Score)
+		missingRequirements := buildMissingRequirementItems(category)
+		missingCount := len(missingRequirements)
+		if potentialGain <= 0 || missingCount == 0 {
+			continue
+		}
+
+		candidates = append(candidates, evidenceRecommendationCandidate{
+			recommendation: model.EvidenceNextRecommendation{
+				CategoryID:           category.CategoryID,
+				Code:                 category.CategoryID,
+				Name:                 category.Name,
+				CurrentScore:         progress.Score,
+				MaxScore:             category.Weight,
+				PotentialGRSGain:     potentialGain,
+				RequiredCount:        progress.RequiredCount,
+				FulfilledCount:       progress.FulfilledCount,
+				MissingRequiredCount: missingCount,
+				Status:               progress.Status,
+				Reason:               buildEvidenceRecommendationReason(missingCount, potentialGain),
+				MissingRequirements:  missingRequirements,
+			},
+			sortOrder: category.SortOrder,
+		})
+	}
+
+	sort.SliceStable(candidates, func(i, j int) bool {
+		left := candidates[i].recommendation
+		right := candidates[j].recommendation
+
+		if left.PotentialGRSGain != right.PotentialGRSGain {
+			return left.PotentialGRSGain > right.PotentialGRSGain
+		}
+		if left.MissingRequiredCount != right.MissingRequiredCount {
+			return left.MissingRequiredCount < right.MissingRequiredCount
+		}
+		return candidates[i].sortOrder < candidates[j].sortOrder
+	})
+
+	if limit <= 0 || limit > len(candidates) {
+		limit = len(candidates)
+	}
+
+	recommendations := make([]model.EvidenceNextRecommendation, 0, limit)
+	for i := 0; i < limit; i++ {
+		recommendation := candidates[i].recommendation
+		recommendation.Rank = i + 1
+		recommendations = append(recommendations, recommendation)
+	}
+
+	return recommendations
+}
+
+func buildMissingRequirementItems(category *entity.EvidenceCategory) []model.EvidenceRequirementItem {
+	requirements := make([]model.EvidenceRequirementItem, 0)
+	for _, requirement := range category.Requirements {
+		if hasFulfilledDocument(requirement.EvidenceDocuments) {
+			continue
+		}
+
+		requirements = append(requirements, model.EvidenceRequirementItem{
+			RequirementID: requirement.RequirementID,
+			Name:          requirement.Name,
+			Description:   requirement.Description,
+			IsRequired:    requirement.IsRequired,
+		})
+	}
+
+	return requirements
+}
+
+func buildEvidenceRecommendationReason(missingCount int, potentialGain float64) string {
+	documentLabel := "dokumen"
+	return fmt.Sprintf("Lengkapi %d %s untuk menambah hingga %.0f poin GRS.", missingCount, documentLabel, potentialGain)
+}
+
+func mapEvidenceRecommendationProgress(recommendations []model.EvidenceNextRecommendation) []model.EvidenceCategoryProgress {
+	progress := make([]model.EvidenceCategoryProgress, 0, len(recommendations))
+	for _, recommendation := range recommendations {
+		progress = append(progress, model.EvidenceCategoryProgress{
+			CategoryID:     recommendation.CategoryID,
+			Code:           recommendation.Code,
+			Name:           recommendation.Name,
+			Weight:         recommendation.MaxScore,
+			RequiredCount:  recommendation.RequiredCount,
+			FulfilledCount: recommendation.FulfilledCount,
+			Score:          recommendation.CurrentScore,
+			Status:         recommendation.Status,
+		})
+	}
+
+	return progress
 }
 
 func buildCategoryStatus(requiredCount int, fulfilledCount int) string {

@@ -8,10 +8,35 @@ import (
 )
 
 type EvidenceSummaryResponse struct {
-	GRSScore          float64                    `json:"grs_score"`
-	PassportThreshold float64                    `json:"passport_threshold"`
-	PassportStatus    string                     `json:"passport_status"`
-	Categories        []EvidenceCategoryProgress `json:"categories"`
+	GRSScore            float64                      `json:"grs_score"`
+	PassportThreshold   float64                      `json:"passport_threshold"`
+	PassportStatus      string                       `json:"passport_status"`
+	Categories          []EvidenceCategoryProgress   `json:"categories"`
+	OnChainDocuments    EvidenceOnChainDocuments     `json:"on_chain_documents"`
+	NextRecommendations []EvidenceNextRecommendation `json:"next_recommendations"`
+}
+
+type EvidenceOnChainDocuments struct {
+	Count      int                       `json:"count"`
+	Total      int                       `json:"total"`
+	Percentage float64                   `json:"percentage"`
+	Items      []EvidenceOnChainDocument `json:"items"`
+}
+
+type EvidenceOnChainDocument struct {
+	EvidenceID       uuid.UUID `json:"evidence_id"`
+	CategoryID       string    `json:"category_id"`
+	CategoryName     string    `json:"category_name"`
+	RequirementID    *string   `json:"requirement_id,omitempty"`
+	RequirementName  string    `json:"requirement_name"`
+	FileName         string    `json:"file_name"`
+	FilePath         string    `json:"file_path"`
+	FileHash         string    `json:"file_hash"`
+	MimeType         string    `json:"mime_type"`
+	FileSize         int64     `json:"file_size"`
+	BlockchainTxHash string    `json:"blockchain_tx_hash"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
 }
 
 type EvidenceCategoryProgress struct {
@@ -26,10 +51,27 @@ type EvidenceCategoryProgress struct {
 }
 
 type EvidenceCategoryDetailResponse struct {
-	Category     EvidenceCategoryProgress   `json:"category"`
-	Requirements []EvidenceRequirementItem  `json:"requirements"`
-	Documents    []EvidenceDocumentItem     `json:"documents"`
-	NextPriority []EvidenceCategoryProgress `json:"next_priority"`
+	Category            EvidenceCategoryProgress     `json:"category"`
+	Requirements        []EvidenceRequirementItem    `json:"requirements"`
+	Documents           []EvidenceDocumentItem       `json:"documents"`
+	NextPriority        []EvidenceCategoryProgress   `json:"next_priority"`
+	NextRecommendations []EvidenceNextRecommendation `json:"next_recommendations"`
+}
+
+type EvidenceNextRecommendation struct {
+	Rank                 int                       `json:"rank"`
+	CategoryID           string                    `json:"category_id"`
+	Code                 string                    `json:"code"`
+	Name                 string                    `json:"name"`
+	CurrentScore         float64                   `json:"current_score"`
+	MaxScore             float64                   `json:"max_score"`
+	PotentialGRSGain     float64                   `json:"potential_grs_gain"`
+	RequiredCount        int                       `json:"required_count"`
+	FulfilledCount       int                       `json:"fulfilled_count"`
+	MissingRequiredCount int                       `json:"missing_required_count"`
+	Status               string                    `json:"status"`
+	Reason               string                    `json:"reason"`
+	MissingRequirements  []EvidenceRequirementItem `json:"missing_requirements"`
 }
 
 type EvidenceRequirementItem struct {

@@ -53,3 +53,15 @@ func (r *Rest) IssueGreenPassport(c *gin.Context) {
 
 	response.Success(c, http.StatusCreated, "success to issue green passport", result)
 }
+
+func (r *Rest) GetGreenPassportStatus(c *gin.Context) {
+	userID := helper.GetAuthenticatedUserID(c)
+
+	result, err := r.service.GreenPassportService.GetGreenPassportStatus(userID)
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+
+	response.Success(c, http.StatusOK, result.Message, result)
+}

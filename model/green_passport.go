@@ -32,6 +32,60 @@ type IssueGreenPassportResponse struct {
 	IssuedAt         time.Time                    `json:"issued_at"`
 }
 
+type GreenPassportStatusResponse struct {
+	Issued         bool                             `json:"issued"`
+	Message        string                           `json:"message"`
+	Profile        *GreenPassportStatusProfile      `json:"profile,omitempty"`
+	GreenPassport  *GreenPassportStatusDetail       `json:"green_passport,omitempty"`
+	Share          *GreenPassportStatusShare        `json:"share,omitempty"`
+	OnChainProof   *GreenPassportStatusOnChainProof `json:"on_chain_proof,omitempty"`
+	NextAction     *GreenPassportStatusNextAction   `json:"next_action,omitempty"`
+	CategoryScores []GreenPassportCategoryScore     `json:"category_scores,omitempty"`
+}
+
+type GreenPassportStatusProfile struct {
+	ProfileID    uuid.UUID `json:"profile_id"`
+	BusinessName string    `json:"business_name"`
+	OwnerName    string    `json:"owner_name,omitempty"`
+	SectorName   string    `json:"sector_name"`
+	Province     string    `json:"province"`
+	City         string    `json:"city"`
+}
+
+type GreenPassportStatusDetail struct {
+	PassportID    uuid.UUID `json:"passport_id"`
+	PublicSlug    string    `json:"public_slug"`
+	PassportURL   string    `json:"passport_url"`
+	QRCodeURL     string    `json:"qr_code_url"`
+	GRSScore      float64   `json:"grs_score"`
+	Tier          string    `json:"tier"`
+	TierLabel     string    `json:"tier_label"`
+	Status        string    `json:"status"`
+	IssuedAt      time.Time `json:"issued_at"`
+	LastUpdatedAt time.Time `json:"last_updated_at"`
+}
+
+type GreenPassportStatusShare struct {
+	URL string `json:"url"`
+}
+
+type GreenPassportStatusOnChainProof struct {
+	Network          string `json:"network"`
+	ChainID          int64  `json:"chain_id"`
+	ContractAddress  string `json:"contract_address"`
+	BlockchainTxHash string `json:"blockchain_tx_hash"`
+	ShortTxHash      string `json:"short_tx_hash"`
+	BlockNumber      uint64 `json:"block_number"`
+	ExplorerURL      string `json:"explorer_url,omitempty"`
+	Confirmation     string `json:"confirmation"`
+}
+
+type GreenPassportStatusNextAction struct {
+	Title       string  `json:"title"`
+	Description string  `json:"description"`
+	TargetScore float64 `json:"target_score,omitempty"`
+}
+
 type PublicUMKMDirectoryQuery struct {
 	Search    string `form:"search"`
 	SectorIDs string `form:"sector_ids"`
@@ -43,9 +97,9 @@ type PublicUMKMDirectoryQuery struct {
 }
 
 type PublicUMKMDirectoryResponse struct {
-	Meta    PublicUMKMDirectoryMeta    `json:"meta"`
-	Filters PublicUMKMDirectoryFilters `json:"filters"`
-	Items   []PublicUMKMDirectoryItem  `json:"items"`
+	Meta    PublicUMKMDirectoryMeta     `json:"meta"`
+	Filters *PublicUMKMDirectoryFilters `json:"filters,omitempty"`
+	Items   []PublicUMKMDirectoryItem   `json:"items"`
 }
 
 type PublicUMKMDirectoryMeta struct {

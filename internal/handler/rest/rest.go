@@ -75,6 +75,7 @@ func (r *Rest) MountEndpoint() {
 
 	greenPassport := baseURL.Group("/green-passports")
 	greenPassport.Use(r.middleware.AuthenticateUser)
+	greenPassport.GET("/status", r.GetGreenPassportStatus)
 	greenPassport.POST("/issue", r.IssueGreenPassport)
 
 	proposals := baseURL.Group("/proposals")

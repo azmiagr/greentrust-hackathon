@@ -25,6 +25,7 @@ import (
 
 type IGreenPassportService interface {
 	IssueGreenPassport(userID uuid.UUID) (*model.IssueGreenPassportResponse, error)
+	GetGreenPassportStatus(userID uuid.UUID) (*model.GreenPassportStatusResponse, error)
 	GetPublicUMKMDirectory(query model.PublicUMKMDirectoryQuery) (*model.PublicUMKMDirectoryResponse, error)
 	GetPublicUMKMDetail(profileID uuid.UUID) (*model.PublicUMKMDetailResponse, error)
 }
@@ -71,22 +72,7 @@ func (s *GreenPassportService) GetPublicUMKMDirectory(query model.PublicUMKMDire
 		return nil, apperrors.InternalServer("failed to count public umkm directory")
 	}
 
-	sectors, err := s.umkmProfileRepo.GetPublicUMKMDirectorySectorFilters(s.db)
-	if err != nil {
-		return nil, apperrors.InternalServer("failed to get sector filters")
-	}
-
-	provinces, err := s.umkmProfileRepo.GetPublicUMKMDirectoryProvinceFilters(s.db)
-	if err != nil {
-		return nil, apperrors.InternalServer("failed to get province filters")
-	}
-
-	tiers, err := s.umkmProfileRepo.GetPublicUMKMDirectoryTierFilters(s.db)
-	if err != nil {
-		return nil, apperrors.InternalServer("failed to get tier filters")
-	}
-
-	return &model.PublicUMKMDirectoryResponse{
+	result := &model.PublicUMKMDirectoryResponse{
 		Meta: model.PublicUMKMDirectoryMeta{
 			Page:              param.Page,
 			Limit:             param.Limit,
@@ -94,13 +80,18 @@ func (s *GreenPassportService) GetPublicUMKMDirectory(query model.PublicUMKMDire
 			Showing:           len(items),
 			ActiveFilterCount: activeFilterCount,
 		},
-		Filters: model.PublicUMKMDirectoryFilters{
-			Sectors:   mapPublicUMKMSectorFilters(sectors),
-			Provinces: mapPublicUMKMProvinceFilters(provinces),
-			Tiers:     mapPublicUMKMTierFilters(tiers),
-		},
 		Items: mapPublicUMKMDirectoryItems(items),
-	}, nil
+	}
+
+	if activeFilterCount > 0 {
+		filters, err := s.getPublicUMKMDirectoryFilters()
+		if err != nil {
+			return nil, err
+		}
+		result.Filters = filters
+	}
+
+	return result, nil
 }
 
 func (s *GreenPassportService) GetPublicUMKMDetail(profileID uuid.UUID) (*model.PublicUMKMDetailResponse, error) {
@@ -176,6 +167,104 @@ func (s *GreenPassportService) GetPublicUMKMDetail(profileID uuid.UUID) (*model.
 	}, nil
 }
 
+func (s *GreenPassportService) getPublicUMKMDirectoryFilters() (*model.PublicUMKMDirectoryFilters, error) {
+	sectors, err := s.umkmProfileRepo.GetPublicUMKMDirectorySectorFilters(s.db)
+	if err != nil {
+		return nil, apperrors.InternalServer("failed to get sector filters")
+	}
+
+	provinces, err := s.umkmProfileRepo.GetPublicUMKMDirectoryProvinceFilters(s.db)
+	if err != nil {
+		return nil, apperrors.InternalServer("failed to get province filters")
+	}
+
+	tiers, err := s.umkmProfileRepo.GetPublicUMKMDirectoryTierFilters(s.db)
+	if err != nil {
+		return nil, apperrors.InternalServer("failed to get tier filters")
+	}
+
+	return &model.PublicUMKMDirectoryFilters{
+		Sectors:   mapPublicUMKMSectorFilters(sectors),
+		Provinces: mapPublicUMKMProvinceFilters(provinces),
+		Tiers:     mapPublicUMKMTierFilters(tiers),
+	}, nil
+}
+
+func (s *GreenPassportService) GetGreenPassportStatus(userID uuid.UUID) (*model.GreenPassportStatusResponse, error) {
+	profile, err := s.umkmProfileRepo.GetUMKMProfile(s.db, model.GetUMKMProfileParam{UserID: userID})
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperrors.NotFound("business profile not found")
+		}
+		return nil, apperrors.InternalServer("failed to get business profile")
+	}
+
+	passport, err := s.passportRepo.GetByProfileID(s.db, profile.ProfileID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return &model.GreenPassportStatusResponse{
+				Issued:  false,
+				Message: "you haven't been issued a passport yet",
+				Profile: &model.GreenPassportStatusProfile{
+					ProfileID:    profile.ProfileID,
+					BusinessName: profile.BusinessName,
+					SectorName:   profile.SectorID.String(),
+					Province:     profile.BusinessProvince,
+					City:         profile.BusinessCity,
+				},
+				NextAction: &model.GreenPassportStatusNextAction{
+					Title:       "Issue your GreenTrust Passport",
+					Description: "Complete the required evidence and issue your passport once your GRS reaches the threshold.",
+					TargetScore: evidencePassportThreshold,
+				},
+			}, nil
+		}
+		return nil, apperrors.InternalServer("failed to get green passport")
+	}
+
+	tier, tierLabel := buildPublicUMKMTier(passport.GRSScore)
+	passportURL := buildPassportURL(passport.PublicSlug)
+
+	return &model.GreenPassportStatusResponse{
+		Issued:  true,
+		Message: "green passport has been issued",
+		Profile: &model.GreenPassportStatusProfile{
+			ProfileID:    profile.ProfileID,
+			BusinessName: profile.BusinessName,
+			SectorName:   profile.SectorID.String(),
+			Province:     profile.BusinessProvince,
+			City:         profile.BusinessCity,
+		},
+		GreenPassport: &model.GreenPassportStatusDetail{
+			PassportID:    passport.PassportID,
+			PublicSlug:    passport.PublicSlug,
+			PassportURL:   passportURL,
+			QRCodeURL:     passport.QRCodeURL,
+			GRSScore:      passport.GRSScore,
+			Tier:          tier,
+			TierLabel:     tierLabel,
+			Status:        passport.Status,
+			IssuedAt:      passport.IssuedAt,
+			LastUpdatedAt: passport.LastUpdatedAt,
+		},
+		Share: &model.GreenPassportStatusShare{
+			URL: passportURL,
+		},
+		OnChainProof: &model.GreenPassportStatusOnChainProof{
+			Network:          passport.NetworkName,
+			ChainID:          passport.ChainID,
+			ContractAddress:  passport.ContractAddress,
+			BlockchainTxHash: passport.BlockchainTxHash,
+			ShortTxHash:      shortenTxHash(passport.BlockchainTxHash),
+			BlockNumber:      passport.BlockNumber,
+			ExplorerURL:      buildTxExplorerURL(passport.BlockchainTxHash),
+			Confirmation:     "confirmed",
+		},
+		NextAction:     buildGreenPassportStatusNextAction(passport.GRSScore),
+		CategoryScores: mapGreenPassportCategoryScores(passport.GRSBreakdown),
+	}, nil
+}
+
 func (s *GreenPassportService) IssueGreenPassport(userID uuid.UUID) (*model.IssueGreenPassportResponse, error) {
 	if s.blockchainClient == nil {
 		return nil, apperrors.InternalServer("blockchain client is not configured")
@@ -198,14 +287,14 @@ func (s *GreenPassportService) IssueGreenPassport(userID uuid.UUID) (*model.Issu
 		return nil, apperrors.InternalServer("failed to calculate grs")
 	}
 
+	docs, err := collectIssuableRequiredEvidenceDocuments(categories)
+	if err != nil {
+		return nil, err
+	}
+
 	grs, breakdown := calculatePassportGRS(categories)
 	if grs < evidencePassportThreshold {
 		return nil, apperrors.BadRequest("grs score is below passport threshold")
-	}
-
-	docs, err := s.evidenceRepo.GetReviewedEvidenceDocumentsByProfileID(s.db, profile.ProfileID)
-	if err != nil {
-		return nil, apperrors.InternalServer("failed to get reviewed documents")
 	}
 
 	if len(docs) == 0 {
@@ -297,6 +386,59 @@ func collectDocumentHashes(docs []*entity.EvidenceDocument) []string {
 	return hashes
 }
 
+func collectIssuableRequiredEvidenceDocuments(categories []*entity.EvidenceCategory) ([]*entity.EvidenceDocument, error) {
+	docs := make([]*entity.EvidenceDocument, 0)
+	missingRequirements := make([]string, 0)
+
+	for _, category := range categories {
+		if category == nil {
+			continue
+		}
+
+		for _, requirement := range category.Requirements {
+			doc := selectIssuableEvidenceDocument(requirement.EvidenceDocuments)
+			if !requirement.IsRequired {
+				if doc != nil {
+					docs = append(docs, doc)
+				}
+				continue
+			}
+
+			if doc == nil {
+				missingRequirements = append(missingRequirements, fmt.Sprintf("%s - %s", category.CategoryID, requirement.Name))
+				continue
+			}
+
+			docs = append(docs, doc)
+		}
+	}
+
+	if len(missingRequirements) > 0 {
+		return nil, apperrors.BadRequest("required evidence documents must be reviewed before issuing passport")
+	}
+
+	return docs, nil
+}
+
+func selectIssuableEvidenceDocument(docs []entity.EvidenceDocument) *entity.EvidenceDocument {
+	for i := range docs {
+		if isIssuableEvidenceStatus(docs[i].Status) {
+			return &docs[i]
+		}
+	}
+
+	return nil
+}
+
+func isIssuableEvidenceStatus(status string) bool {
+	switch status {
+	case "reviewed", "on_chain":
+		return true
+	default:
+		return false
+	}
+}
+
 func calculatePassportGRS(categories []*entity.EvidenceCategory) (float64, entity.GRSBreakdown) {
 	total := 0.0
 	breakdown := make(entity.GRSBreakdown, 0, len(categories))
@@ -360,6 +502,46 @@ func mapGreenPassportCategoryScores(breakdown entity.GRSBreakdown) []model.Green
 	}
 
 	return scores
+}
+
+func shortenTxHash(txHash string) string {
+	txHash = strings.TrimSpace(txHash)
+	if len(txHash) <= 13 {
+		return txHash
+	}
+
+	return fmt.Sprintf("%s...%s", txHash[:6], txHash[len(txHash)-4:])
+}
+
+func buildTxExplorerURL(txHash string) string {
+	txHash = strings.TrimSpace(txHash)
+	if txHash == "" {
+		return ""
+	}
+
+	template := strings.TrimSpace(os.Getenv("BLOCKCHAIN_EXPLORER_TX_URL"))
+	if template != "" {
+		return strings.ReplaceAll(template, "{tx_hash}", txHash)
+	}
+
+	baseURL := strings.TrimRight(os.Getenv("BLOCKCHAIN_EXPLORER_BASE_URL"), "/")
+	if baseURL == "" {
+		return ""
+	}
+
+	return fmt.Sprintf("%s/tx/%s", baseURL, txHash)
+}
+
+func buildGreenPassportStatusNextAction(grsScore float64) *model.GreenPassportStatusNextAction {
+	if grsScore >= 92 {
+		return nil
+	}
+
+	return &model.GreenPassportStatusNextAction{
+		Title:       "Improve your GreenTrust score",
+		Description: "Add more verified evidence to unlock a stronger badge on your public profile.",
+		TargetScore: 92,
+	}
 }
 
 func buildPublicUMKMDirectoryFiltersParam(query model.PublicUMKMDirectoryQuery) (model.PublicUMKMDirectoryFiltersParam, int, error) {
